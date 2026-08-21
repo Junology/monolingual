@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'package:collection/collection.dart';
 
 /// Record type for a word.
 /// Each word record contains the word itself, a list of variant forms, a list
@@ -8,7 +9,8 @@ class WordRecord {
   final String word;
 
   /// A list of variant forms of the word, such as plural forms or different tenses.
-  LinkedHashSet<String> variants;
+  /// The list is sorted in ascending order.
+  List<String> variants;
 
   /// A list of synonyms for the word.
   LinkedHashSet<String> synonyms;
@@ -24,7 +26,7 @@ class WordRecord {
   /// For adding a new word, use [WordRecord.newWord] instead.
   ///
   /// [word] is the word itself.
-  /// [variants] is a list of variant forms of the word.
+  /// [variants] is a sorted list of variant forms of the word.
   /// [synonyms] is a list of synonyms for the word.
   /// [usageExamples] is a list of usage examples for the word.
   WordRecord(
@@ -43,9 +45,11 @@ class WordRecord {
     List<String>? synonyms,
     List<String>? usageExamples,
   }) {
+    variants ??= [];
+    variants.sort();
     return WordRecord(
       word,
-      variants: LinkedHashSet<String>.from(variants ?? []),
+      variants: variants,
       synonyms: LinkedHashSet<String>.from(synonyms ?? []),
       usageExamples: usageExamples ?? [],
     );
@@ -53,7 +57,27 @@ class WordRecord {
 
   /// Adds a new variant form to the word.
   /// Returns true if the variant was added, false if it was already present.
-  bool addVariant(String variant) => variants.add(variant);
+  ///
+  bool addVariant(String variant) {
+    // == WARNING ==
+    // The method uses binary search to find the correct position for the new
+    // variant in [variants].
+    // Make sure that [variants] is sorted before calling this method.
+    // ==
+    int low = 0, high = variants.length - 1;
+    while (low <= high) {
+      int mid = (low + high) ~/ 2;
+      if (variants[mid] == variant) {
+        return false; // Variant already exists
+      } else if (variants[mid].compareTo(variant) < 0) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    variants.insert(low, variant);
+    return true;
+  }
 
   // Remove a variant form from the word.
   /// Returns true if the variant was removed, false if it was not present.
