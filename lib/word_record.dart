@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'package:collection/collection.dart';
 
 /// Record type for a word.
 /// Each word record contains the word itself, a list of variant forms, a list
