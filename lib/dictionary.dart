@@ -24,13 +24,20 @@ class Dictionary extends Iterable<WordRecord> {
     : _buckets = List<_DictionaryNode?>.filled(capacity, null),
       size = 0;
 
+  factory Dictionary.from(Iterable<WordRecord> records, {int capacity = 16}) {
+    final dictionary = Dictionary(capacity: capacity);
+    for (var record in records) {
+      dictionary.add(record);
+    }
+    return dictionary;
+  }
+
   int _hash(String key) => key.hashCode % capacity;
 
   void _rehash(int newCapacity) {
     final oldBuckets = _buckets;
     capacity = newCapacity;
     _buckets = List<_DictionaryNode?>.filled(capacity, null);
-    size = 0;
 
     for (var bucket in oldBuckets) {
       var entry = bucket;
@@ -111,6 +118,15 @@ class Dictionary extends Iterable<WordRecord> {
 
   @override
   Iterator<WordRecord> get iterator => DictionaryIterator(_buckets.iterator);
+
+  @override
+  String toString() {
+    final records = <String>[];
+    for (var record in this) {
+      records.add(record.toString());
+    }
+    return 'Dictionary(records: [${records.join(', ')}])';
+  }
 }
 
 /// An iterator for the [Dictionary] class.
@@ -118,9 +134,7 @@ class DictionaryIterator implements Iterator<WordRecord> {
   final Iterator<_DictionaryNode?> _currentBucket;
   _DictionaryNode? _currentNode;
 
-  DictionaryIterator(this._currentBucket) {
-    _nextBucket();
-  }
+  DictionaryIterator(this._currentBucket);
 
   bool _nextBucket() {
     while (_currentBucket.moveNext()) {

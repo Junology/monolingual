@@ -20,8 +20,7 @@ class WordRecord {
   int get synonymsCount => synonyms.length;
 
   /// Creates a new instance of [WordRecord].
-  /// This is meant to be used to construct a [WordRecord] from existing data,
-  /// such as when loading from a database.
+  /// This is meant to be used to construct a [WordRecord] from existing data.
   /// For adding a new word, use [WordRecord.newWord] instead.
   ///
   /// [word] is the word itself.
@@ -38,12 +37,17 @@ class WordRecord {
   /// Creates a new [WordRecord] for a new word.
   /// This constructor initializes [variants], [synonyms], and [usageExamples]
   /// to empty.
-  factory WordRecord.newWord(String word) {
+  factory WordRecord.newWord(
+    String word, {
+    List<String>? variants,
+    List<String>? synonyms,
+    List<String>? usageExamples,
+  }) {
     return WordRecord(
       word,
-      variants: LinkedHashSet<String>(),
-      synonyms: LinkedHashSet<String>(),
-      usageExamples: [],
+      variants: LinkedHashSet<String>.from(variants ?? []),
+      synonyms: LinkedHashSet<String>.from(synonyms ?? []),
+      usageExamples: usageExamples ?? [],
     );
   }
 
@@ -73,4 +77,10 @@ class WordRecord {
   /// Hash code
   @override
   int get hashCode => Object.hash(word, variants, synonyms, usageExamples);
+
+  /// String representation of the word record.
+  @override
+  String toString() {
+    return 'WordRecord(word: $word, variants: $variants, synonyms: $synonyms, usageExamples: $usageExamples)';
+  }
 }
