@@ -1,5 +1,5 @@
 name: monolingual
-description: "A new Flutter project."
+description: "A cross-platform Flutter app for translation-free vocabulary development via synonyms and contextual usage"
 publish_to: 'none'
 version: 0.1.0+1
 
