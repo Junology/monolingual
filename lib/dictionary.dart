@@ -1,3 +1,4 @@
+import 'package:monolingual/radix_tree.dart';
 import 'package:monolingual/word_record.dart';
 
 class _DictionaryNode {
@@ -12,13 +13,16 @@ class _DictionaryNode {
 ///
 /// - [add]/[remove]: Add or remove a [WordRecord] from the dictionary.
 /// - [find]: Find a [WordRecord] by its word.
+/// - [isearch]: Find words by prefix (incremental search).
 ///
 /// ### Implementation details
 /// The class contains [WordRecord] objects in a hashtable with chaining for collision resolution.
+/// A [RadixTree] is maintained as a secondary index for prefix search.
 class Dictionary extends Iterable<WordRecord> {
   int capacity;
   int size;
   List<_DictionaryNode?> _buckets;
+  final RadixTree _radixTree = RadixTree();
 
   Dictionary({this.capacity = 16})
     : _buckets = List<_DictionaryNode?>.filled(capacity, null),
@@ -75,6 +79,8 @@ class Dictionary extends Iterable<WordRecord> {
     _buckets[index] = _DictionaryNode(record, _buckets[index]);
     size++;
 
+    _radixTree.insert(record.word);
+
     if (size * 2 > capacity) _rehash(capacity * 2);
 
     return true;
@@ -105,11 +111,15 @@ class Dictionary extends Iterable<WordRecord> {
 
     if (removedRecord != null) {
       size--;
+      _radixTree.delete(word);
       if (size * 6 < capacity && capacity > 16) _rehash(capacity ~/ 2);
     }
 
     return removedRecord;
   }
+
+  /// Returns all words starting with [key], in lexicographic order.
+  Iterable<String> isearch(String key) => _radixTree.wordsWithPrefix(key);
 
   /// Subscript operator to find a [WordRecord] by its primary word.
   /// Returns the record if found, otherwise returns null.

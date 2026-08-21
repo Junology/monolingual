@@ -196,4 +196,46 @@ void main() {
     final words = dictionary.map((record) => record.word).toSet();
     expect(words, containsAll(['test', 'exam', 'quiz']));
   });
+
+  group('Dictionary.isearch', () {
+    late Dictionary d;
+
+    setUp(() {
+      d = Dictionary.from([testRecord, examRecord, quizRecord]);
+    });
+
+    test('returns all words for empty prefix', () {
+      expect(d.isearch(''), orderedEquals(['exam', 'quiz', 'test']));
+    });
+
+    test('returns matching words for a shared prefix', () {
+      d.add(WordRecord.newWord('examine'));
+      expect(d.isearch('ex'), orderedEquals(['exam', 'examine']));
+    });
+
+    test('returns a single word for a unique prefix', () {
+      expect(d.isearch('qu'), orderedEquals(['quiz']));
+    });
+
+    test('returns a word on exact match', () {
+      expect(d.isearch('test'), orderedEquals(['test']));
+    });
+
+    test('returns empty for a non-existent prefix', () {
+      expect(d.isearch('xyz'), isEmpty);
+    });
+
+    test('reflects word removal', () {
+      d.add(WordRecord.newWord('testing'));
+      d.remove('test');
+      expect(d.isearch('test'), orderedEquals(['testing']));
+    });
+
+    test('handles path compression after delete', () {
+      d.add(WordRecord.newWord('examine'));
+      d.remove('exam');
+      expect(d.isearch('ex'), orderedEquals(['examine']));
+      expect(d.isearch('exam'), orderedEquals(['examine']));
+    });
+  });
 }
