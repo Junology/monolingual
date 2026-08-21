@@ -120,6 +120,76 @@ void main() {
     expect(dictionary.find('quiz'), isNotNull);
   });
 
+  test('Dictionary should not add duplicate records', () {
+    final anotherTestRecord = WordRecord.newWord(
+      'test',
+      variants: ['tests', 'tested'],
+      synonyms: ['verify', 'check', 'try'],
+      usageExamples: ['This should be tested correctly.'],
+    );
+
+    final added = dictionary.add(anotherTestRecord);
+    expect(added, isFalse);
+    expect(dictionary.size, 3);
+    expect(dictionary.find('test'), isNotNull);
+    expect(dictionary.find('test'), equals(testRecord));
+  });
+
+  test('Dictionary should not remove non-existent records', () {
+    final removedRecord = dictionary.remove('nonexistent');
+    expect(removedRecord, isNull);
+    expect(dictionary.size, 3);
+    expect(dictionary.find('test'), isNotNull);
+    expect(dictionary.find('exam'), isNotNull);
+    expect(dictionary.find('quiz'), isNotNull);
+  });
+
+  test('Dictionary should be consistent after rehash', () {
+    final int newRecordsCount = 100;
+    final initialSize = dictionary.size;
+    final initialRecords = dictionary.toList();
+
+    // Force a rehash by adding enough records
+    for (int i = 0; i < newRecordsCount; i++) {
+      dictionary.add(WordRecord.newWord('word$i'));
+    }
+
+    expect(dictionary.size, initialSize + newRecordsCount);
+    for (var record in initialRecords) {
+      expect(dictionary.find(record.word), isNotNull);
+      expect(dictionary.find(record.word), equals(record));
+    }
+
+    // Force to shrink the dictionary by removing records
+    for (int i = 0; i < newRecordsCount; i++) {
+      dictionary.remove('word$i');
+    }
+    expect(dictionary.size, initialSize);
+    expect(dictionary, containsAll(initialRecords));
+  });
+
+  test('Dictionary should have editable records', () {
+    final testRecord = dictionary.find('test');
+    expect(testRecord, isNotNull);
+    expect(testRecord!.synonymsCount, 3);
+
+    // Add a new synonym
+    final added = testRecord.addSynonym('trial');
+    expect(added, isTrue);
+    expect(testRecord.synonymsCount, 4);
+    expect(testRecord.synonyms, contains('trial'));
+
+    // Try to add the same synonym again
+    final addedAgain = testRecord.addSynonym('trial');
+    expect(addedAgain, isFalse);
+    expect(testRecord.synonymsCount, 4);
+
+    // Remove a synonym
+    final removed = testRecord.removeSynonym('trial');
+    expect(removed, isTrue);
+    expect(testRecord.synonymsCount, 3);
+  });
+
   test('DictionaryIterator should iterate over all records', () {
     expect(dictionary.length, 3);
     final words = dictionary.map((record) => record.word).toSet();
