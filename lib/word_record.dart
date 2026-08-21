@@ -55,9 +55,17 @@ class WordRecord {
   /// Returns true if the variant was added, false if it was already present.
   bool addVariant(String variant) => variants.add(variant);
 
+  // Remove a variant form from the word.
+  /// Returns true if the variant was removed, false if it was not present.
+  bool removeVariant(String variant) => variants.remove(variant);
+
   /// Adds a new synonym to the word.
   /// Returns true if the synonym was added, false if it was already present.
   bool addSynonym(String synonym) => synonyms.add(synonym);
+
+  /// Removes a synonym from the word.
+  /// Returns true if the synonym was removed, false if it was not present.
+  bool removeSynonym(String synonym) => synonyms.remove(synonym);
 
   /// Adds a new usage example for the word.
   /// @remarks This method does not check for duplicates.
