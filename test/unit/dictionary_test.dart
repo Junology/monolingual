@@ -176,8 +176,8 @@ void main() {
     // Add a new synonym
     final added = testRecord.addSynonym('trial');
     expect(added, isTrue);
-    expect(testRecord.synonymsCount, 4);
-    expect(testRecord.synonyms, contains('trial'));
+    expect(dictionary['test']!.synonymsCount, 4);
+    expect(dictionary['test']!.synonyms, contains('trial'));
 
     // Try to add the same synonym again
     final addedAgain = testRecord.addSynonym('trial');
@@ -187,7 +187,8 @@ void main() {
     // Remove a synonym
     final removed = testRecord.removeSynonym('trial');
     expect(removed, isTrue);
-    expect(testRecord.synonymsCount, 3);
+    expect(dictionary['test']!.synonymsCount, 3);
+    expect(dictionary['test']!.synonyms, isNot(contains('trial')));
   });
 
   test('DictionaryIterator should iterate over all records', () {
