@@ -12,6 +12,7 @@ class _DictionaryNode {
 /// The class provides the following methods:
 ///
 /// - [add]/[remove]: Add or remove a [WordRecord] from the dictionary.
+/// - [update]: Update an existing [WordRecord] in the dictionary.
 /// - [find]: Find a [WordRecord] by its word.
 /// - [isearch]: Find words by prefix (incremental search).
 ///
@@ -68,6 +69,10 @@ class Dictionary extends Iterable<WordRecord> {
   /// Returns the record if found, otherwise returns null.
   WordRecord? find(String word) => _findNode(word, _hash(word))?.record;
 
+  /// Updates an existing [WordRecord] in the dictionary.
+  /// [record]'s `word` field must match an existing record in the dictionary.
+  /// Returns true if the record was updated, false if no record with the given
+  /// word exists
   bool update(WordRecord record) {
     final index = _hash(record.word);
     final node = _findNode(record.word, index);
