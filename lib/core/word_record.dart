@@ -54,6 +54,16 @@ class WordRecord {
     );
   }
 
+  /// Deep copy for [WordRecord].
+  WordRecord clone() {
+    return WordRecord(
+      word.substring(0), // Create a new string instance
+      variants: List<String>.from(variants),
+      synonyms: LinkedHashSet<String>.from(synonyms),
+      usageExamples: List<String>.from(usageExamples),
+    );
+  }
+
   /// Adds a new variant form to the word.
   /// Returns true if the variant was added, false if it was already present.
   ///
@@ -82,6 +92,12 @@ class WordRecord {
   /// Returns true if the variant was removed, false if it was not present.
   bool removeVariant(String variant) => variants.remove(variant);
 
+  /// Replace the list of variants with a new list.
+  void replaceVariants(List<String> newVariants) {
+    variants = List<String>.from(newVariants);
+    variants.sort();
+  }
+
   /// Adds a new synonym to the word.
   /// Returns true if the synonym was added, false if it was already present.
   bool addSynonym(String synonym) => synonyms.add(synonym);
@@ -90,9 +106,27 @@ class WordRecord {
   /// Returns true if the synonym was removed, false if it was not present.
   bool removeSynonym(String synonym) => synonyms.remove(synonym);
 
+  /// Replaces the list of synonyms with a new list.
+  void replaceSynonyms(Iterable<String> newSynonyms) {
+    synonyms = LinkedHashSet<String>.from(newSynonyms);
+  }
+
   /// Adds a new usage example for the word.
   /// @remarks This method does not check for duplicates.
   void addUsageExample(String example) => usageExamples.add(example);
+
+  /// Removes a usage example at the specified index.
+  /// Returns true if the example was removed, false if the index was out of bounds.
+  bool removeUsageExampleAt(int index) {
+    if (index < 0 || index >= usageExamples.length) return false;
+    usageExamples.removeAt(index);
+    return true;
+  }
+
+  /// Replaces the list of usage examples with a new list.
+  void replaceUsageExamples(List<String> newExamples) {
+    usageExamples = List<String>.from(newExamples);
+  }
 
   /// Equality
   @override

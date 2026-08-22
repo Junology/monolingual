@@ -68,6 +68,16 @@ class Dictionary extends Iterable<WordRecord> {
   /// Returns the record if found, otherwise returns null.
   WordRecord? find(String word) => _findNode(word, _hash(word))?.record;
 
+  bool update(WordRecord record) {
+    final index = _hash(record.word);
+    final node = _findNode(record.word, index);
+    if (node == null) return false;
+    node.record.replaceVariants(record.variants);
+    node.record.replaceSynonyms(record.synonyms);
+    node.record.replaceUsageExamples(record.usageExamples);
+    return true;
+  }
+
   /// Adds a new [WordRecord] to the dictionary.
   /// Returns true if the record was added, false if a record with the same word already exists.
   bool add(WordRecord record) {
