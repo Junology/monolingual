@@ -1,5 +1,5 @@
-import 'package:monolingual/radix_tree.dart';
-import 'package:monolingual/word_record.dart';
+import 'package:monolingual/core/radix_tree.dart';
+import 'package:monolingual/core/word_record.dart';
 
 class _DictionaryNode {
   final WordRecord record;

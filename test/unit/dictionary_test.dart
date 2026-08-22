@@ -1,5 +1,5 @@
-import 'package:monolingual/word_record.dart';
-import 'package:monolingual/dictionary.dart';
+import 'package:monolingual/core/word_record.dart';
+import 'package:monolingual/core/dictionary.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
