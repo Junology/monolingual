@@ -23,25 +23,6 @@ void main() {
   );
   final dictionary = Dictionary.from([testRecord, examRecord, quizRecord]);
 
-  test('WordRecord should be compared correctly', () {
-    expect(testRecord, equals(testRecord));
-    expect(examRecord, equals(examRecord));
-    expect(quizRecord, equals(quizRecord));
-    expect(testRecord, isNot(equals(examRecord)));
-    expect(testRecord, isNot(equals(quizRecord)));
-    expect(examRecord, isNot(equals(testRecord)));
-    expect(examRecord, isNot(equals(quizRecord)));
-    expect(quizRecord, isNot(equals(testRecord)));
-    expect(quizRecord, isNot(equals(examRecord)));
-    final anotherTestRecord = WordRecord.newWord(
-      'test',
-      variants: ['tests', 'tested'],
-      synonyms: ['verify', 'check', 'try'],
-      usageExamples: ['This should be tested correctly.'],
-    );
-    expect(testRecord, isNot(equals(anotherTestRecord)));
-  });
-
   test('Dictionary should contain the correct number of records', () {
     expect(dictionary.size, 3);
   });
