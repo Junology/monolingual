@@ -58,6 +58,16 @@ int _commonPrefixLength(String a, String b, int offset) {
 class RadixTree {
   final _RadixNode _root = _RadixNode('', []);
 
+  RadixTree();
+
+  factory RadixTree.fromIterable(Iterable<String> words) {
+    final tree = RadixTree();
+    for (var word in words) {
+      tree.insert(word);
+    }
+    return tree;
+  }
+
   /// Insert a word into [RadixTree].
   /// Returns true if the word was added, false if it already existed.
   ///
@@ -207,7 +217,7 @@ class RadixTree {
 
   Iterable<String> _collectAll(_RadixNode node, String prefix) sync* {
     final nextPrefix = prefix + node.label;
-    if (node.children.isEmpty) {
+    if (node.children.isEmpty && nextPrefix.isNotEmpty) {
       yield nextPrefix;
     }
 

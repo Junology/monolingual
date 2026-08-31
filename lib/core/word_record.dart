@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'package:collection/collection.dart';
 
 /// Record type for a word.
 /// Each word record contains the word itself, a list of variant forms, a list
@@ -134,14 +135,19 @@ class WordRecord {
     if (identical(this, other)) return true;
     return other is WordRecord &&
         other.word == word &&
-        other.variants == variants &&
-        other.synonyms == synonyms &&
-        other.usageExamples == usageExamples;
+        other.variants.equals(variants) &&
+        const SetEquality().equals(other.synonyms, synonyms) &&
+        other.usageExamples.equals(usageExamples);
   }
 
   /// Hash code
   @override
-  int get hashCode => Object.hash(word, variants, synonyms, usageExamples);
+  int get hashCode => Object.hash(
+    word,
+    const ListEquality<String>().hash(variants),
+    const SetEquality<String>().hash(synonyms),
+    const ListEquality<String>().hash(usageExamples),
+  );
 
   /// String representation of the word record.
   @override
