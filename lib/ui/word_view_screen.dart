@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:monolingual/core/word_record.dart';
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_widget.dart';
+import 'package:monolingual/ui/word_input_widget.dart';
 
 class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
   final Dictionary dictionary;
@@ -32,17 +33,22 @@ class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
     final recordInDict = dictionary.find(word);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.navigate_before),
-          onPressed: () => Navigator.of(context).pop(),
+        leadingWidth: 128.0,
+        leading: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.navigate_before),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            IconButton(
+              icon: const Icon(Icons.home),
+              onPressed: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
+              constraints: const BoxConstraints(),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () =>
-                Navigator.of(context).popUntil((route) => route.isFirst),
-          ),
-          const Spacer(),
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: (recordInDict == record)
@@ -60,18 +66,47 @@ class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
       body: SingleChildScrollView(
         child: WordViewWidget(
           wordRecord: record,
-          onVariantAdd: () {},
-          onVariantDelete: (variant) {},
-          onSynonymAdd: () {},
+          onVariantAdd: () {
+            showDialog(
+              context: context,
+              builder: (context) => WordInputDialog(
+                onSubmitted: (value) {
+                  if (value.isNotEmpty && !record.variants.contains(value)) {
+                    setState(() => record.variants.add(value));
+                  }
+                },
+              ),
+            );
+          },
+          onVariantDelete: (variant) {
+            setState(() => record.variants.remove(variant));
+          },
+          onSynonymAdd: () {
+            showDialog(
+              context: context,
+              builder: (context) => WordInputDialog(
+                wordIndex: (input) => dictionary.isearch(input),
+                onSubmitted: (value) {
+                  if (value.isNotEmpty && !record.synonyms.contains(value)) {
+                    setState(() => record.synonyms.add(value));
+                  }
+                },
+              ),
+            );
+          },
           onSynonymTap: (synonym) {
             Navigator.push(
               context,
               WordViewScreen(dictionary: dictionary, word: synonym),
             );
           },
-          onSynonymDelete: (synonym) {},
+          onSynonymDelete: (synonym) {
+            setState(() => record.synonyms.remove(synonym));
+          },
           onExampleAdd: () {},
-          onExampleDelete: (index) {},
+          onExampleDelete: (index) {
+            setState(() => record.usageExamples.removeAt(index));
+          },
         ),
       ),
     );

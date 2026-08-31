@@ -61,6 +61,7 @@ class WordViewWidget extends StatelessWidget {
                     onDeleted: onVariantDelete != null
                         ? () => onVariantDelete!.call(variant)
                         : null,
+                    deleteButtonTooltipMessage: '',
                   );
                 }),
                 if (onVariantAdd != null)
@@ -109,6 +110,7 @@ class WordViewWidget extends StatelessWidget {
                     child: Chip(
                       label: Text(synonym, style: entryStyle),
                       onDeleted: () => onSynonymDelete?.call(synonym),
+                      deleteButtonTooltipMessage: '',
                     ),
                   );
                 }),
