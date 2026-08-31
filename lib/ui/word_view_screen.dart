@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:monolingual/core/word_record.dart';
 import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/ui/dialogs.dart';
 import 'package:monolingual/ui/word_view_widget.dart';
-import 'package:monolingual/ui/word_input_widget.dart';
 
 class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
   final Dictionary dictionary;
@@ -103,7 +103,15 @@ class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
           onSynonymDelete: (synonym) {
             setState(() => record.synonyms.remove(synonym));
           },
-          onExampleAdd: () {},
+          onExampleAdd: () {
+            showDialog(
+              context: context,
+              builder: (context) => TextInputDialog(
+                onSubmitted: (value) =>
+                    setState(() => record.usageExamples.add(value)),
+              ),
+            );
+          },
           onExampleDelete: (index) {
             setState(() => record.usageExamples.removeAt(index));
           },
