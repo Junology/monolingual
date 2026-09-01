@@ -5,6 +5,7 @@ class WordInputField extends StatefulWidget {
   final Map<String, Iterable<String> Function(String)> wordIndexMap;
   final bool showDictionaryName;
   final TextEditingController? textEditingController;
+  final ValueNotifier<String?>? dictionaryNameNotifier;
   final FocusNode? focusNode;
   final void Function(String word, String? dictionaryName)? onSubmitted;
   final bool autofocus;
@@ -14,6 +15,7 @@ class WordInputField extends StatefulWidget {
     required this.wordIndexMap,
     this.showDictionaryName = false,
     this.textEditingController,
+    this.dictionaryNameNotifier,
     this.focusNode,
     this.onSubmitted,
     this.autofocus = false,
@@ -24,16 +26,18 @@ class WordInputField extends StatefulWidget {
 }
 
 class _WordInputFieldState extends State<WordInputField> {
-  String? _selectedDictionaryName;
-  late FocusNode _focusNode;
   late TextEditingController _textEditingController;
+  late ValueNotifier<String?> _dictionaryNameNotifier;
+  late FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
     _textEditingController =
         widget.textEditingController ?? TextEditingController();
+    _dictionaryNameNotifier =
+        widget.dictionaryNameNotifier ?? ValueNotifier<String?>(null);
+    _focusNode = widget.focusNode ?? FocusNode();
   }
 
   @override
@@ -49,11 +53,14 @@ class _WordInputFieldState extends State<WordInputField> {
 
   @override
   void dispose() {
-    if (widget.focusNode == null) {
-      _focusNode.dispose();
-    }
     if (widget.textEditingController == null) {
       _textEditingController.dispose();
+    }
+    if (widget.dictionaryNameNotifier == null) {
+      _dictionaryNameNotifier.dispose();
+    }
+    if (widget.focusNode == null) {
+      _focusNode.dispose();
     }
     super.dispose();
   }
@@ -62,7 +69,7 @@ class _WordInputFieldState extends State<WordInputField> {
     BuildContext context, [
     String? dictionaryName,
   ]) {
-    dictionaryName ??= _selectedDictionaryName;
+    dictionaryName ??= _dictionaryNameNotifier.value;
     if (!widget.showDictionaryName || dictionaryName == null) {
       return null;
     }
@@ -101,22 +108,39 @@ class _WordInputFieldState extends State<WordInputField> {
       },
       displayStringForOption: (option) => option.value,
       onSelected: (option) =>
-          setState(() => _selectedDictionaryName = option.key),
+          setState(() => _dictionaryNameNotifier.value = option.key),
       fieldViewBuilder:
-          (context, textEditingController, focusNode, onSubmitted) {
-            return TextField(
-              controller: textEditingController,
-              focusNode: focusNode,
-              autofocus: widget.autofocus,
-              onChanged: (value) {
-                setState(() => _selectedDictionaryName = null);
-              },
-              onSubmitted: (value) {
-                onSubmitted();
-                widget.onSubmitted?.call(value, _selectedDictionaryName);
-              },
-              decoration: InputDecoration(
-                suffix: _buildDictionaryNameSuffix(context),
+          (
+            BuildContext context,
+            TextEditingController textEditingController,
+            FocusNode focusNode,
+            VoidCallback onSubmitted,
+          ) {
+            return ValueListenableBuilder<String?>(
+              valueListenable: _dictionaryNameNotifier,
+              builder: (context, dictionaryName, child) => TextField(
+                controller: textEditingController,
+                focusNode: focusNode,
+                autofocus: widget.autofocus,
+                onChanged: (value) {
+                  setState(() => _dictionaryNameNotifier.value = null);
+                },
+                onSubmitted: (value) {
+                  onSubmitted();
+                  if (dictionaryName == null) {
+                    final entry = widget.wordIndexMap.entries.singleWhereOrNull(
+                      (entry) => entry.value(value).contains(value),
+                    );
+                    if (entry != null) {
+                      dictionaryName = entry.key;
+                      setState(() => _dictionaryNameNotifier.value = entry.key);
+                    }
+                  }
+                  widget.onSubmitted?.call(value, dictionaryName);
+                },
+                decoration: InputDecoration(
+                  suffix: _buildDictionaryNameSuffix(context, dictionaryName),
+                ),
               ),
             );
           },

@@ -1,59 +1,85 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:monolingual/core/radix_tree.dart';
-import 'package:monolingual/core/word_record.dart';
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  final Map<String, Dictionary> dictionaries;
+
+  const HomeScreen({super.key, required this.dictionaries});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final TextEditingController _dictionaryFieldController;
+  late final TextEditingController _wordInputController;
+  late final ValueNotifier<String?> _dictionaryNameNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _dictionaryFieldController = TextEditingController();
+    _wordInputController = TextEditingController();
+    _dictionaryNameNotifier = ValueNotifier<String?>(null);
+  }
+
+  @override
+  void dispose() {
+    _dictionaryFieldController.dispose();
+    _wordInputController.dispose();
+    _dictionaryNameNotifier.dispose();
+    super.dispose();
+  }
+
+  void _gotoWord(BuildContext context, String word, String? dictionaryName) {
+    if (dictionaryName == null) return;
+
+    final dictionary = widget.dictionaries[dictionaryName];
+
+    if (dictionary == null) {
+      if (kDebugMode) {
+        debugPrint('Unknown dictionary name: $dictionaryName');
+      }
+      return;
+    }
+
+    Navigator.push(context, WordViewScreen(dictionary: dictionary, word: word));
+  }
 
   @override
   Widget build(BuildContext context) {
-    WordRecord testRecord = WordRecord.newWord(
-      'test',
-      variants: ['tests'],
-      synonyms: ['experiment', 'exam', 'quiz', 'trial', 'examination'],
-      usageExamples: [
-        'This test can be failed.',
-        'Another example of a test.',
-        'Yet another test example.',
-      ],
-    );
-    Dictionary dictionary = Dictionary.from([testRecord]);
-    RadixTree verbTree = RadixTree.fromIterable([
-      "test",
-      "expreriment",
-      "exmaine",
-    ]);
-    RadixTree nounTree = RadixTree.fromIterable([
-      "test",
-      "exam",
-      "quiz",
-      "trial",
-      "examination",
-    ]);
-
     return Scaffold(
       body: Column(
         children: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                WordViewScreen(dictionary: dictionary, word: 'test'),
-              );
-            },
-            child: const Text('Open Word View'),
-          ),
-          WordInputField(
-            wordIndexMap: {
-              'verb': (input) => verbTree.wordsWithPrefix(input),
-              'noun': (input) => nounTree.wordsWithPrefix(input),
-            },
-            showDictionaryName: true,
-            onSubmitted: (value, dictionaryName) =>
-                print('Submitted: $value, Dictionary: $dictionaryName'),
+          Row(
+            children: [
+              const Icon(Icons.search),
+              Expanded(
+                child: WordInputField(
+                  wordIndexMap: widget.dictionaries.map(
+                    (key, value) => MapEntry(key, value.isearch),
+                  ),
+                  showDictionaryName: true,
+                  onSubmitted: (value, dictionaryName) =>
+                      _gotoWord(context, value, dictionaryName),
+                  textEditingController: _wordInputController,
+                  dictionaryNameNotifier: _dictionaryNameNotifier,
+                ),
+              ),
+              IconButton(
+                onPressed: () {
+                  _gotoWord(
+                    context,
+                    _wordInputController.text,
+                    _dictionaryNameNotifier.value,
+                  );
+                },
+                icon: const Icon(Icons.subdirectory_arrow_left),
+              ),
+            ],
           ),
         ],
       ),
