@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:monolingual/ui/home_screen.dart';
 import 'package:monolingual/core/word_record.dart';
 import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/appinfo.dart';
 
-void main() => runApp(const MainApp());
+void main() async {
+  await AppInfo.initialize();
+  runApp(const MainApp());
+}
 
 class MainApp extends StatelessWidget {
   const MainApp({super.key});

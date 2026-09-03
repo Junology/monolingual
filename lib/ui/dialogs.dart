@@ -1,5 +1,40 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide AboutDialog;
 import 'package:monolingual/ui/word_input_widget.dart';
+import 'package:monolingual/appinfo.dart';
+
+class AboutDialog extends StatelessWidget {
+  const AboutDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Icon(Icons.info),
+      content: Column(
+        children: [
+          Text(AppInfo.name, style: Theme.of(context).textTheme.titleLarge),
+          Text(AppInfo.version, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(8.0),
+              child: SingleChildScrollView(child: Text(AppInfo.licenseText)),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.check),
+        ),
+      ],
+    );
+  }
+}
 
 /// A common dialog with a content widget and nonverbal confirm/cancel buttons.
 class CommonConfirmDialog extends StatelessWidget {

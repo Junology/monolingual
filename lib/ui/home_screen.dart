@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide AboutDialog;
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
 import 'package:monolingual/ui/text_filter_widget.dart';
+import 'package:monolingual/ui/dialogs.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, Dictionary> dictionaries;
@@ -63,7 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.info, color: Colors.white),
             onPressed: () {
-              // TODO: Show "about this app" dialog
+              // `AboutDialog` is from `dialogs.dart`; not the one from Flutter.
+              showDialog(context: context, builder: (_) => const AboutDialog());
             },
           ),
         ],
