@@ -40,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _gotoWord(BuildContext context, String word, String? dictionaryName) {
+    dictionaryName ??= _filteredDictionariesNotifier.value.singleOrNull;
     if (dictionaryName == null) return;
 
     final dictionary = widget.dictionaries[dictionaryName];
@@ -85,11 +86,15 @@ class _HomeScreenState extends State<HomeScreen> {
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: () {
-                  setState(() {
-                    // TODO: 1. Prompt user for dictionary name
-                    // TODO: 2. Directly modifying the dictionaries map is not ideal, consider using a state management solution
-                    widget.dictionaries['New Dictionary'] = Dictionary.from([]);
-                  });
+                  // TODO: Direct update the dictionaries map is not ideal, consider using a state management solution
+                  showDialog(
+                    context: context,
+                    builder: (_) => TextInputDialog(
+                      onSubmitted: (name) => setState(
+                        () => widget.dictionaries[name] = Dictionary.from([]),
+                      ),
+                    ),
+                  );
                 },
               ),
             ],
