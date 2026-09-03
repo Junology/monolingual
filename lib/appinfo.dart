@@ -8,11 +8,29 @@ import 'package:package_info_plus/package_info_plus.dart';
 class AppInfo {
   static late final PackageInfo _packageInfo;
   static late final String licenseText;
+
+  /// Directory where user data should be stored.
+  /// The data here is supposed to persist across application launches.
   static late final String userDir;
+
+  /// Directory where temporary data should be stored.
+  /// The data here may be cleared by the system in the next application launch.
   static late final String tmpDir;
+
+  /// Directory where cache data should be stored.
+  /// The data here may be cleared by the system at any time.
   static late final String cacheDir;
+
+  /// Directory where database files should be stored.
+  /// The data here is supposed to persist across application launches.
+  /// In contrast to [userDir], this directory is not supposed to be accessed
+  /// by the user directly.
   static late final String dbDir;
+
+  /// Directory where app configuration files should be put.
+  /// The field may be empty for some platforms.
   static late final String cfgDir;
+
   static String? _lastUserDir;
 
   /// Name of the application.
@@ -23,6 +41,8 @@ class AppInfo {
   /// DO not forget `AppInfo.initialize()` beforehand.
   static String get version => _packageInfo.version;
 
+  /// Field to remember the last used user directory across the app.
+  /// It falls back to [userDir] if no last user directory is set.
   static String get lastUserDir => _lastUserDir ?? userDir;
   static set lastUserDir(String dir) => _lastUserDir = dir;
 
