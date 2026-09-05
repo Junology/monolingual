@@ -135,8 +135,11 @@ class _WordInputFieldState extends State<WordInputField> {
                       dictionaryName = entry.key;
                       setState(() => _dictionaryNameNotifier.value = entry.key);
                     }
+                  } else if (dictionaryName != _dictionaryNameNotifier.value) {
+                    setState(() {});
+                  } else {
+                    widget.onSubmitted?.call(value, dictionaryName);
                   }
-                  widget.onSubmitted?.call(value, dictionaryName);
                 },
                 decoration: InputDecoration(
                   suffix: _buildDictionaryNameSuffix(context, dictionaryName),
@@ -145,6 +148,8 @@ class _WordInputFieldState extends State<WordInputField> {
             );
           },
       optionsViewBuilder: (context, onSelected, options) {
+        // Get the index of the currently highlighted option.
+        int highlightedOptionIndex = AutocompleteHighlightedOption.of(context);
         return Align(
           alignment: Alignment.topLeft,
           child: Material(
@@ -160,6 +165,8 @@ class _WordInputFieldState extends State<WordInputField> {
                   return ListTile(
                     title: Text(option.value),
                     trailing: _buildDictionaryNameSuffix(context, option.key),
+                    selected: index == highlightedOptionIndex,
+                    selectedTileColor: Theme.of(context).highlightColor,
                     onTap: () {
                       onSelected(option);
                     },

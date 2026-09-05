@@ -29,7 +29,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _filteredDictionariesNotifier = ValueNotifier<Iterable<String>>(
       widget.dictionaries.keys,
     );
-    _filteredDictionariesNotifier.addListener(() => setState(() {}));
+    _filteredDictionariesNotifier.addListener(() {
+      // If the current selected dictionary for the word does not meet
+      // the constraints of the filter, then reset it.
+      if (!_filteredDictionariesNotifier.value.contains(
+        _dictionaryNameNotifier.value,
+      )) {
+        _dictionaryNameNotifier.value = null;
+      }
+      setState(() {});
+    });
   }
 
   @override
