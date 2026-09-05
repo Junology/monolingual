@@ -348,7 +348,9 @@ void main() {
 
       try {
         await DBService().db.close();
-      } on AssertionError {}
+      } on AssertionError {
+        // Ignore assertion errors in DB closing.
+      }
       await DBService.initialize();
       final service = DBService();
       await service.ensureDictionary(dictName);
