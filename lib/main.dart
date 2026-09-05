@@ -7,17 +7,30 @@ import 'package:monolingual/service/database.dart';
 import 'package:monolingual/appinfo.dart';
 
 void main() async {
+  // Initialize backend services and app info.
   WidgetsFlutterBinding.ensureInitialized();
   await AppInfo.initialize();
   await DBService.initialize(
     dbPath: p.join(AppInfo.dbDir, '${AppInfo.name}.db'),
   );
 
-  runApp(MainApp());
+  // Load dictionaries from the database
+  final dbService = DBService();
+  final dictionaryNames = await dbService.dictionaryNames();
+
+  final dictionaries = {
+    for (final name in dictionaryNames)
+      name: await DBDictionary.openFromDB(name),
+  };
+
+  // Launch UI
+  runApp(MainApp(dictionaries: dictionaries));
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+  final Map<String, Dictionary> dictionaries;
+
+  const MainApp({super.key, required this.dictionaries});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +87,11 @@ class MainApp extends StatelessWidget {
 
     return MaterialApp(
       home: HomeScreen(
-        dictionaries: {'noun': nounDictionary, 'verb': verbDictionary},
+        dictionaries: {
+          ...dictionaries,
+          'noun': nounDictionary,
+          'verb': verbDictionary,
+        },
       ),
     );
   }

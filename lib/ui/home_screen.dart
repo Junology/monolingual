@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AboutDialog;
-import 'package:monolingual/service/database.dart';
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
@@ -17,8 +16,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final DBService _service;
-
   late final TextEditingController _wordInputController;
   late final ValueNotifier<String?> _dictionaryNameNotifier;
   late final ValueNotifier<Iterable<String>> _filteredDictionariesNotifier;
@@ -27,7 +24,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    _service = DBService();
     _wordInputController = TextEditingController();
     _dictionaryNameNotifier = ValueNotifier<String?>(null);
     _filteredDictionariesNotifier = ValueNotifier<Iterable<String>>(
@@ -45,9 +41,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addDictionary(String name) async {
-    await _service.ensureDictionary(name);
-    final dict = DBDictionary(name);
-    await dict.initialize();
+    // Do nothing when the dictionary already exists.
+    if (widget.dictionaries.keys.contains(name)) return;
+
+    final dict = await DBDictionary.openFromDB(name);
     setState(() => widget.dictionaries[name] = dict);
   }
 

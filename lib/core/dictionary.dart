@@ -11,9 +11,6 @@ import 'package:monolingual/service/database.dart';
 /// - [find]: async find a [WordRecord] by its word.
 /// - [isearch]: **sync** find words by prefix (incremental search).
 abstract interface class Dictionary {
-  FutureOr<void> initialize();
-  FutureOr<void> close();
-
   FutureOr<WordRecord?> find(String word);
   // Returns false if a record with the same word already exists.
   FutureOr<bool> add(WordRecord record);
@@ -96,11 +93,6 @@ class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
     }
     return null;
   }
-
-  @override
-  void initialize() {}
-  @override
-  void close() {}
 
   /// Find a record [WordRecord] by its primary word.
   /// Returns the record if found, otherwise returns null.
@@ -234,19 +226,23 @@ class DBDictionary implements Dictionary {
 
   int _size = 0;
 
-  DBDictionary(this.name);
+  DBDictionary._internal(this.name);
 
-  @override
-  Future<void> initialize() async {
+  /// Create and initialize a [DBDictionary] instance from the given dictionary name.
+  static Future<DBDictionary> openFromDB(String name) async {
+    final dictionary = DBDictionary._internal(name);
+    await dictionary._initialize();
+    return dictionary;
+  }
+
+  Future<void> _initialize() async {
+    _service.ensureDictionary(name);
     final rows = await _service.wordsInDictionary(name);
     for (final row in rows) {
       _radixTree.insert(row);
     }
     _size = rows.length;
   }
-
-  @override
-  void close() {}
 
   @override
   Future<WordRecord?> find(String word) => _service.findWord(name, word);

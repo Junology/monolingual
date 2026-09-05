@@ -358,8 +358,7 @@ void main() {
         await service.insertWord(dictName, word);
       }
 
-      dictionary = DBDictionary(dictName);
-      await dictionary.initialize();
+      dictionary = await DBDictionary.openFromDB(dictName);
     });
 
     _registerSharedTests(
