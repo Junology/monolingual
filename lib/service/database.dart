@@ -21,10 +21,15 @@ class DBService {
   ///
   /// @param dbPath The path to the SQLite database file should be located at.
   /// If not specified, an in-memory database will be used.
-  static Future<void> initialize({String dbPath = inMemoryDatabasePath}) async {
+  static Future<void> initialize({
+    String dbPath = inMemoryDatabasePath,
+    bool preferNonIsolate = false,
+  }) async {
     if (Platform.isLinux || Platform.isWindows) {
       sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
+      databaseFactory = preferNonIsolate
+          ? databaseFactoryFfiNoIsolate
+          : databaseFactoryFfi;
     }
 
     _db = await openDatabase(

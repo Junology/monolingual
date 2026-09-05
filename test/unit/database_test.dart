@@ -11,7 +11,7 @@ void main() {
     } on AssertionError {
       // DB was not yet initialized; nothing to close.
     }
-    await DBService.initialize();
+    await DBService.initialize(preferNonIsolate: true);
   });
 
   group('DBService.dictionaryNames()', () {

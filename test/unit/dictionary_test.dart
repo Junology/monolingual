@@ -351,7 +351,7 @@ void main() {
       } on AssertionError {
         // Ignore assertion errors in DB closing.
       }
-      await DBService.initialize();
+      await DBService.initialize(preferNonIsolate: true);
       final service = DBService();
       await service.ensureDictionary(dictName);
       for (final word in testWords) {
