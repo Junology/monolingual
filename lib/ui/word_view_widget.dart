@@ -4,6 +4,7 @@ import 'package:monolingual/core/word_record.dart';
 
 class WordViewWidget extends StatelessWidget {
   final WordRecord wordRecord;
+  final bool Function(String)? isKnownSynonym;
   final void Function()? onVariantAdd;
   final void Function(String)? onVariantDelete;
   final void Function()? onSynonymAdd;
@@ -15,6 +16,7 @@ class WordViewWidget extends StatelessWidget {
   const WordViewWidget({
     super.key,
     required this.wordRecord,
+    this.isKnownSynonym,
     this.onVariantAdd,
     this.onVariantDelete,
     this.onSynonymAdd,
@@ -105,9 +107,16 @@ class WordViewWidget extends StatelessWidget {
               runSpacing: 4.0,
               children: [
                 ...wordRecord.synonyms.map((synonym) {
+                  final isKnown = isKnownSynonym?.call(synonym) ?? false;
                   return GestureDetector(
                     onTap: () => onSynonymTap?.call(synonym),
                     child: Chip(
+                      avatar: isKnown
+                          ? null
+                          : Icon(
+                              Icons.question_mark,
+                              size: entryStyle?.fontSize,
+                            ),
                       label: Text(synonym, style: entryStyle),
                       onDeleted: () => onSynonymDelete?.call(synonym),
                       deleteButtonTooltipMessage: '',
