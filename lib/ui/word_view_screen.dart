@@ -7,30 +7,67 @@ import 'package:monolingual/ui/word_view_widget.dart';
 class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
   final Dictionary dictionary;
   final String word;
-  WordRecord record;
 
   WordViewScreen({required this.dictionary, required this.word})
-    : record = dictionary.find(word)?.clone() ?? WordRecord.newWord(word),
-      super(settings: RouteSettings(name: '/word/$word'));
+    : super(settings: RouteSettings(name: '/word/$word'));
 
   @override
-  Widget buildContent(BuildContext context) {
-    return StatefulBuilder(
-      builder: (context, setState) => _buildStateful(context, setState),
-    );
-  }
+  Widget buildContent(BuildContext context) =>
+      _WordViewBody(dictionary: dictionary, word: word);
 
   @override
   bool get maintainState => true;
 
   @override
   String get debugLabel => '${super.debugLabel}(${super.settings.name})';
+}
 
-  Widget _buildStateful(
-    BuildContext context,
-    void Function(void Function()) setState,
-  ) {
-    final recordInDict = dictionary.find(word);
+class _WordViewBody extends StatefulWidget {
+  final Dictionary dictionary;
+  final String word;
+
+  const _WordViewBody({required this.dictionary, required this.word});
+
+  @override
+  State<_WordViewBody> createState() => _WordViewBodyState();
+}
+
+class _WordViewBodyState extends State<_WordViewBody> {
+  late WordRecord _record;
+  // The last version persisted to the dictionary; null means the word is new.
+  WordRecord? _savedRecord;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecord();
+  }
+
+  Future<void> _loadRecord() async {
+    final found = await widget.dictionary.find(widget.word);
+    setState(() {
+      _savedRecord = found;
+      _record = found?.clone() ?? WordRecord.newWord(widget.word);
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_savedRecord == null) {
+      await widget.dictionary.add(_record);
+    } else {
+      await widget.dictionary.update(_record);
+    }
+    setState(() => _savedRecord = _record.clone());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         leadingWidth: 128.0,
@@ -51,44 +88,36 @@ class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
-            onPressed: (recordInDict == record)
-                ? null
-                : () => setState(() {
-                    if (recordInDict == null) {
-                      dictionary.add(record);
-                    } else {
-                      dictionary.update(record);
-                    }
-                  }),
+            onPressed: (_record == _savedRecord) ? null : _save,
           ),
         ],
       ),
       body: SingleChildScrollView(
         child: WordViewWidget(
-          wordRecord: record,
+          wordRecord: _record,
           onVariantAdd: () {
             showDialog(
               context: context,
               builder: (context) => WordInputDialog(
                 onSubmitted: (value) {
-                  if (value.isNotEmpty && !record.variants.contains(value)) {
-                    setState(() => record.variants.add(value));
+                  if (value.isNotEmpty && !_record.variants.contains(value)) {
+                    setState(() => _record.variants.add(value));
                   }
                 },
               ),
             );
           },
           onVariantDelete: (variant) {
-            setState(() => record.variants.remove(variant));
+            setState(() => _record.variants.remove(variant));
           },
           onSynonymAdd: () {
             showDialog(
               context: context,
               builder: (context) => WordInputDialog(
-                wordIndex: (input) => dictionary.isearch(input),
+                wordIndex: widget.dictionary.isearch,
                 onSubmitted: (value) {
-                  if (value.isNotEmpty && !record.synonyms.contains(value)) {
-                    setState(() => record.synonyms.add(value));
+                  if (value.isNotEmpty && !_record.synonyms.contains(value)) {
+                    setState(() => _record.synonyms.add(value));
                   }
                 },
               ),
@@ -97,23 +126,23 @@ class WordViewScreen extends PageRoute<void> with MaterialRouteTransitionMixin {
           onSynonymTap: (synonym) {
             Navigator.push(
               context,
-              WordViewScreen(dictionary: dictionary, word: synonym),
+              WordViewScreen(dictionary: widget.dictionary, word: synonym),
             );
           },
           onSynonymDelete: (synonym) {
-            setState(() => record.synonyms.remove(synonym));
+            setState(() => _record.synonyms.remove(synonym));
           },
           onExampleAdd: () {
             showDialog(
               context: context,
               builder: (context) => TextInputDialog(
                 onSubmitted: (value) =>
-                    setState(() => record.usageExamples.add(value)),
+                    setState(() => _record.usageExamples.add(value)),
               ),
             );
           },
           onExampleDelete: (index) {
-            setState(() => record.usageExamples.removeAt(index));
+            setState(() => _record.usageExamples.removeAt(index));
           },
         ),
       ),

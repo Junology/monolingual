@@ -1,222 +1,368 @@
-import 'package:monolingual/core/word_record.dart';
-import 'package:monolingual/core/dictionary.dart';
+import 'package:collection/collection.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/core/word_record.dart';
+import 'package:monolingual/service/database.dart';
 
-void main() {
-  final WordRecord testRecord = WordRecord.newWord(
+List<WordRecord> _makeTestRecords() => [
+  WordRecord.newWord(
     'test',
     variants: ['tests'],
     synonyms: ['experiment', 'exam', 'quiz'],
     usageExamples: ['This test can be failed.'],
-  );
-  final WordRecord examRecord = WordRecord.newWord(
+  ),
+  WordRecord.newWord(
     'exam',
     variants: ['exams'],
     synonyms: ['test', 'quiz'],
     usageExamples: ['This exam can be failed.'],
-  );
-  final WordRecord quizRecord = WordRecord.newWord(
+  ),
+  WordRecord.newWord(
     'quiz',
     variants: ['quizzes'],
     synonyms: ['test', 'exam', 'tease'],
     usageExamples: ['This quiz can be failed.'],
-  );
-  final dictionary = Dictionary.from([testRecord, examRecord, quizRecord]);
+  ),
+];
 
-  test('Dictionary should contain the correct number of records', () {
-    expect(dictionary.size, 3);
+// Registers the tests shared by all Dictionary implementations.
+// Getters are used so each test reads the instance set up by the enclosing setUp.
+void _registerSharedTests({
+  required Dictionary Function() dictionary,
+  required List<WordRecord> Function() testWords,
+}) {
+  test('size reflects number of records', () {
+    expect(dictionary().size, testWords().length);
   });
 
-  test('Dictionary should find records by word', () {
-    final testRecord1 = dictionary.find('test');
-    expect(testRecord1, isNotNull);
-    expect(testRecord1!.word, 'test');
-    expect(testRecord1.variants, contains('tests'));
-    expect(testRecord1.synonyms, containsAll(['experiment', 'exam', 'quiz']));
-    expect(testRecord1.usageExamples, contains('This test can be failed.'));
+  group('find()', () {
+    test('returns the matching record', () async {
+      for (final word in testWords()) {
+        expect(await dictionary().find(word.word), equals(word));
+      }
+    });
 
-    final testRecord2 = dictionary.find('exam');
-    expect(testRecord2, isNotNull);
-    expect(testRecord2!.word, 'exam');
-    expect(testRecord2.variants, contains('exams'));
-    expect(testRecord2.synonyms, containsAll(['test', 'quiz']));
-    expect(testRecord2.usageExamples, contains('This exam can be failed.'));
-
-    final testRecord3 = dictionary.find('quiz');
-    expect(testRecord3, isNotNull);
-    expect(testRecord3!.word, 'quiz');
-    expect(testRecord3.variants, contains('quizzes'));
-    expect(testRecord3.synonyms, containsAll(['test', 'exam', 'tease']));
-    expect(testRecord3.usageExamples, contains('This quiz can be failed.'));
+    test('returns null for a non-existent word', () async {
+      if (testWords().any((word) => word.word == 'nonexistent')) {
+        fail('Test setup error: "nonexistent" should not be in testWords');
+      }
+      expect(await dictionary().find('nonexistent'), isNull);
+    });
   });
 
-  test('Dictionary should find records using the index operator', () {
-    final testRecord1 = dictionary['test'];
-    expect(testRecord1, isNotNull);
-    expect(testRecord1, equals(testRecord));
+  group('add()', () {
+    test('returns true and stores the record', () async {
+      final words = testWords();
+      if (words.any((word) => word.word == 'new')) {
+        fail('Test setup error: "new" should not be in testWords');
+      }
+      final newRecord = WordRecord.newWord(
+        'new',
+        variants: ['new'],
+        synonyms: ['fresh'],
+        usageExamples: ['This is a new word.'],
+      );
 
-    final testRecord2 = dictionary['exam'];
-    expect(testRecord2, isNotNull);
-    expect(testRecord2, equals(examRecord));
+      expect(await dictionary().add(newRecord), isTrue);
+      expect(dictionary().size, words.length + 1);
+      expect(await dictionary().find('new'), equals(newRecord));
+      for (final word in words) {
+        expect(await dictionary().find(word.word), equals(word));
+      }
+    });
 
-    final testRecord3 = dictionary['quiz'];
-    expect(testRecord3, isNotNull);
-    expect(testRecord3, equals(quizRecord));
+    test('returns false for a duplicate word', () async {
+      final words = testWords();
+      final first = words.first;
+      final duplicate = WordRecord.newWord(
+        first.word,
+        variants: first.variants.map((v) => '${v}_new').toList(),
+        synonyms: first.synonyms.map((s) => '${s}_new').toList(),
+        usageExamples: first.usageExamples,
+      );
+
+      expect(await dictionary().add(duplicate), isFalse);
+      expect(dictionary().size, words.length);
+      for (final word in words) {
+        expect(await dictionary().find(word.word), equals(word));
+      }
+    });
   });
 
-  test('Dictionary should return null for non-existent records', () {
-    final testRecord1 = dictionary.find('nonexistent');
-    expect(testRecord1, isNull);
+  group('remove()', () {
+    test('returns the removed record and deletes it', () async {
+      final words = testWords();
+      if (words.any((word) => word.word == 'new')) {
+        fail('Test setup error: "new" should not be in testWords');
+      }
+      final newRecord = WordRecord.newWord(
+        'new',
+        variants: ['new'],
+        synonyms: ['fresh'],
+        usageExamples: ['This is a new word.'],
+      );
+      await dictionary().add(newRecord);
 
-    final testRecord2 = dictionary['nonexistent'];
-    expect(testRecord2, isNull);
+      final removed = await dictionary().remove('new');
+      expect(removed, equals(newRecord));
+      expect(dictionary().size, words.length);
+      expect(await dictionary().find('new'), isNull);
+      for (final word in words) {
+        expect(await dictionary().find(word.word), equals(word));
+      }
+    });
+
+    test('returns null for a non-existent word', () async {
+      final words = testWords();
+      if (words.any((word) => word.word == 'nonexistent')) {
+        fail('Test setup error: "nonexistent" should not be in testWords');
+      }
+      expect(await dictionary().remove('nonexistent'), isNull);
+      expect(dictionary().size, words.length);
+    });
   });
 
-  test('Dictionary should add and remove records correctly', () {
-    final newRecord = WordRecord.newWord(
-      'new',
-      variants: ['new'],
-      synonyms: ['fresh'],
-      usageExamples: ['This is a new word.'],
+  group('update()', () {
+    test('returns false for a non-existent word', () async {
+      final words = testWords();
+      if (words.any((word) => word.word == 'nonexistent')) {
+        fail('Test setup error: "nonexistent" should not be in testWords');
+      }
+      expect(
+        await dictionary().update(WordRecord.newWord('nonexistent')),
+        isFalse,
+      );
+      expect(dictionary().size, words.length);
+    });
+
+    test('returns true and persists the updated fields', () async {
+      final words = testWords();
+      final original = words.first;
+      // Build updated record before calling update() since InMemoryDictionary
+      // mutates the stored object in-place (which is the same as words.first).
+      final updated = WordRecord.newWord(
+        original.word,
+        variants: original.variants.map((v) => '${v}_u').toList(),
+        synonyms: original.synonyms.map((s) => '${s}_u').toList(),
+        usageExamples: original.usageExamples.map((e) => '${e}_u').toList(),
+      );
+
+      expect(await dictionary().update(updated), isTrue);
+      expect(dictionary().size, words.length);
+      expect(await dictionary().find(original.word), equals(updated));
+      for (final word in words.skip(1)) {
+        expect(await dictionary().find(word.word), equals(word));
+      }
+    });
+  });
+
+  group('isearch', () {
+    test('returns all words for empty prefix', () {
+      final words = testWords();
+      expect(
+        dictionary().isearch(''),
+        orderedEquals(words.map((word) => word.word).sorted()),
+      );
+    });
+
+    test('returns words for specified prefixes', () {
+      final words = testWords();
+      for (final prefix in ['qu', 'test', 'xyz']) {
+        expect(
+          dictionary().isearch(prefix),
+          orderedEquals(
+            words
+                .map((word) => word.word)
+                .where((word) => word.startsWith(prefix))
+                .sorted(),
+          ),
+        );
+      }
+    });
+
+    test('reflect word addition and removal', () async {
+      final words = testWords();
+      if (words.any((word) => word.word.startsWith('new'))) {
+        fail(
+          'Test setup error: words starting with "new" should not be in testWords',
+        );
+      }
+      for (final word in words) {
+        expect(
+          await dictionary().add(WordRecord.newWord('new_${word.word}')),
+          isTrue,
+        );
+      }
+      final searchResult = dictionary().isearch('new_');
+      expect(searchResult.length, words.length);
+      expect(
+        searchResult,
+        orderedEquals(words.map((word) => 'new_${word.word}').sorted()),
+      );
+      for (final word in words) {
+        expect(await dictionary().remove('new_${word.word}'), isNotNull);
+      }
+      expect(dictionary().isearch('new_'), isEmpty);
+    });
+
+    test(
+      'reflects word addition and removal of words with a prefix shared with existing words',
+      () async {
+        final words = testWords();
+        if (words.any((word) => word.word.endsWith('_new'))) {
+          fail(
+            'Test setup error: words ending with "_new" should not be in testWords',
+          );
+        }
+        for (final word in words) {
+          expect(
+            await dictionary().add(WordRecord.newWord('${word.word}_new')),
+            isTrue,
+          );
+        }
+        for (final word in words) {
+          expect(
+            dictionary().isearch(word.word),
+            orderedEquals(
+              words
+                  .where((w) => w.word.startsWith(word.word))
+                  .expand((w) => [w.word, '${w.word}_new'])
+                  .sorted(),
+            ),
+          );
+        }
+        for (final word in words) {
+          expect(await dictionary().remove('${word.word}_new'), isNotNull);
+        }
+        for (final word in words) {
+          expect(
+            dictionary().isearch(word.word),
+            orderedEquals(
+              words
+                  .map((w) => w.word)
+                  .where((w) => w.startsWith(word.word))
+                  .sorted(),
+            ),
+          );
+        }
+      },
     );
-
-    // Add the new record
-    final added = dictionary.add(newRecord);
-    expect(added, isTrue);
-    expect(dictionary.size, 4);
-    expect(dictionary.find('new'), isNotNull);
-    expect(dictionary.find('new'), equals(newRecord));
-    expect(dictionary.find('test'), isNotNull);
-    expect(dictionary.find('exam'), isNotNull);
-    expect(dictionary.find('quiz'), isNotNull);
-
-    // Remove the new record
-    final removedRecord = dictionary.remove('new');
-    expect(removedRecord, isNotNull);
-    expect(removedRecord!.word, 'new');
-    expect(dictionary.size, 3);
-    expect(dictionary.find('new'), isNull);
-    expect(dictionary.find('test'), isNotNull);
-    expect(dictionary.find('exam'), isNotNull);
-    expect(dictionary.find('quiz'), isNotNull);
   });
+}
 
-  test('Dictionary should not add duplicate records', () {
-    final anotherTestRecord = WordRecord.newWord(
-      'test',
-      variants: ['tests', 'tested'],
-      synonyms: ['verify', 'check', 'try'],
-      usageExamples: ['This should be tested correctly.'],
-    );
-
-    final added = dictionary.add(anotherTestRecord);
-    expect(added, isFalse);
-    expect(dictionary.size, 3);
-    expect(dictionary.find('test'), isNotNull);
-    expect(dictionary.find('test'), equals(testRecord));
-  });
-
-  test('Dictionary should not remove non-existent records', () {
-    final removedRecord = dictionary.remove('nonexistent');
-    expect(removedRecord, isNull);
-    expect(dictionary.size, 3);
-    expect(dictionary.find('test'), isNotNull);
-    expect(dictionary.find('exam'), isNotNull);
-    expect(dictionary.find('quiz'), isNotNull);
-  });
-
-  test('Dictionary should be consistent after rehash', () {
-    final int newRecordsCount = 100;
-    final initialSize = dictionary.size;
-    final initialRecords = dictionary.toList();
-
-    // Force a rehash by adding enough records
-    for (int i = 0; i < newRecordsCount; i++) {
-      dictionary.add(WordRecord.newWord('word$i'));
-    }
-
-    expect(dictionary.size, initialSize + newRecordsCount);
-    for (var record in initialRecords) {
-      expect(dictionary.find(record.word), isNotNull);
-      expect(dictionary.find(record.word), equals(record));
-    }
-
-    // Force to shrink the dictionary by removing records
-    for (int i = 0; i < newRecordsCount; i++) {
-      dictionary.remove('word$i');
-    }
-    expect(dictionary.size, initialSize);
-    expect(dictionary, containsAll(initialRecords));
-  });
-
-  test('Dictionary should have editable records', () {
-    final testRecord = dictionary.find('test');
-    expect(testRecord, isNotNull);
-    expect(testRecord!.synonymsCount, 3);
-
-    // Add a new synonym
-    final added = testRecord.addSynonym('trial');
-    expect(added, isTrue);
-    expect(dictionary['test']!.synonymsCount, 4);
-    expect(dictionary['test']!.synonyms, contains('trial'));
-
-    // Try to add the same synonym again
-    final addedAgain = testRecord.addSynonym('trial');
-    expect(addedAgain, isFalse);
-    expect(testRecord.synonymsCount, 4);
-
-    // Remove a synonym
-    final removed = testRecord.removeSynonym('trial');
-    expect(removed, isTrue);
-    expect(dictionary['test']!.synonymsCount, 3);
-    expect(dictionary['test']!.synonyms, isNot(contains('trial')));
-  });
-
-  test('DictionaryIterator should iterate over all records', () {
-    expect(dictionary.length, 3);
-    final words = dictionary.map((record) => record.word).toSet();
-    expect(words, containsAll(['test', 'exam', 'quiz']));
-  });
-
-  group('Dictionary.isearch', () {
-    late Dictionary d;
+void main() {
+  group('InMemoryDictionary', () {
+    late InMemoryDictionary dictionary;
+    late List<WordRecord> testWords;
 
     setUp(() {
-      d = Dictionary.from([testRecord, examRecord, quizRecord]);
+      testWords = _makeTestRecords();
+      dictionary = InMemoryDictionary.from(testWords);
     });
 
-    test('returns all words for empty prefix', () {
-      expect(d.isearch(''), orderedEquals(['exam', 'quiz', 'test']));
+    _registerSharedTests(
+      dictionary: () => dictionary,
+      testWords: () => testWords,
+    );
+
+    group('[] operator', () {
+      test('returns the matching record', () {
+        for (final word in testWords) {
+          expect(dictionary[word.word], equals(word));
+        }
+      });
+
+      test('returns null for a non-existent word', () {
+        if (testWords.any((w) => w.word == 'nonexistent')) {
+          fail('Test setup error: "nonexistent" should not be in testWords');
+        }
+        expect(dictionary['nonexistent'], isNull);
+      });
     });
 
-    test('returns matching words for a shared prefix', () {
-      d.add(WordRecord.newWord('examine'));
-      expect(d.isearch('ex'), orderedEquals(['exam', 'examine']));
+    test('remains consistent after rehash', () async {
+      if (testWords.any((w) => w.word.startsWith('newword'))) {
+        fail('Test setup error: "newword*" should not be in testWords');
+      }
+      const newRecordsCount = 100;
+      final initialSize = dictionary.size;
+      final initialRecords = dictionary.toList();
+
+      for (int i = 0; i < newRecordsCount; i++) {
+        dictionary.add(WordRecord.newWord('newword$i'));
+      }
+      expect(dictionary.size, initialSize + newRecordsCount);
+      for (final record in initialRecords) {
+        expect(dictionary.find(record.word), equals(record));
+      }
+
+      for (int i = 0; i < newRecordsCount; i++) {
+        dictionary.remove('newword$i');
+      }
+      expect(dictionary.size, initialSize);
+      expect(dictionary, containsAll(initialRecords));
     });
 
-    test('returns a single word for a unique prefix', () {
-      expect(d.isearch('qu'), orderedEquals(['quiz']));
+    // find() returns a shared reference; in-place mutations are visible through [].
+    test('records retrieved via find() are shared references', () async {
+      final target = testWords.first;
+      final targetWord = target.word;
+      final targetSynonymCount = target.synonymsCount;
+
+      if (target.synonyms.any((s) => s.startsWith('new'))) {
+        fail(
+          'Test setup error: synonyms should not start with "new*" in the test record $target.',
+        );
+      }
+      final record = dictionary.find(targetWord);
+      expect(record!.synonymsCount, targetSynonymCount);
+
+      expect(record.addSynonym('newSynonym'), isTrue);
+      expect(dictionary[targetWord]!.synonymsCount, targetSynonymCount + 1);
+      expect(dictionary[targetWord]!.synonyms, contains('newSynonym'));
+
+      expect(record.addSynonym('newSynonym'), isFalse);
+      expect(record.synonymsCount, targetSynonymCount + 1);
+
+      expect(record.removeSynonym('newSynonym'), isTrue);
+      expect(dictionary[targetWord]!.synonymsCount, targetSynonymCount);
+      expect(dictionary[targetWord]!.synonyms, isNot(contains('newSynonym')));
     });
 
-    test('returns a word on exact match', () {
-      expect(d.isearch('test'), orderedEquals(['test']));
+    test('iterator visits all records', () {
+      expect(dictionary.length, testWords.length);
+      expect(
+        dictionary.map((r) => r.word).toSet(),
+        containsAll(testWords.map((w) => w.word)),
+      );
+    });
+  });
+
+  group('DBDictionary', () {
+    late DBDictionary dictionary;
+    late List<WordRecord> testWords;
+
+    setUp(() async {
+      const dictName = 'dict';
+      testWords = _makeTestRecords();
+
+      try {
+        await DBService().db.close();
+      } on AssertionError {}
+      await DBService.initialize();
+      final service = DBService();
+      await service.ensureDictionary(dictName);
+      for (final word in testWords) {
+        await service.insertWord(dictName, word);
+      }
+
+      dictionary = DBDictionary(dictName);
+      await dictionary.initialize();
     });
 
-    test('returns empty for a non-existent prefix', () {
-      expect(d.isearch('xyz'), isEmpty);
-    });
-
-    test('reflects word removal', () {
-      d.add(WordRecord.newWord('testing'));
-      d.remove('test');
-      expect(d.isearch('test'), orderedEquals(['testing']));
-    });
-
-    test('handles path compression after delete', () {
-      d.add(WordRecord.newWord('examine'));
-      d.remove('exam');
-      expect(d.isearch('ex'), orderedEquals(['examine']));
-      expect(d.isearch('exam'), orderedEquals(['examine']));
-    });
+    _registerSharedTests(
+      dictionary: () => dictionary,
+      testWords: () => testWords,
+    );
   });
 }

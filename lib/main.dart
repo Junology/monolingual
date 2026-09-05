@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:monolingual/ui/home_screen.dart';
 import 'package:monolingual/core/word_record.dart';
 import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/service/database.dart';
 import 'package:monolingual/appinfo.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await AppInfo.initialize();
-  runApp(const MainApp());
+  await DBService.initialize(
+    dbPath: p.join(AppInfo.dbDir, '${AppInfo.name}.db'),
+  );
+
+  runApp(MainApp());
 }
 
 class MainApp extends StatelessWidget {
@@ -14,7 +21,7 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Dictionary nounDictionary = Dictionary.from([
+    Dictionary nounDictionary = InMemoryDictionary.from([
       WordRecord.newWord(
         'test',
         variants: ['tests'],
@@ -46,7 +53,7 @@ class MainApp extends StatelessWidget {
         synonyms: ['test', 'exam', 'quiz', 'trial'],
       ),
     ]);
-    Dictionary verbDictionary = Dictionary.from([
+    Dictionary verbDictionary = InMemoryDictionary.from([
       WordRecord.newWord(
         'test',
         variants: ['tests', 'testing', 'tested'],

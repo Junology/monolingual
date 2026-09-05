@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AboutDialog;
+import 'package:monolingual/service/database.dart';
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
@@ -16,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late final DBService _service;
+
   late final TextEditingController _wordInputController;
   late final ValueNotifier<String?> _dictionaryNameNotifier;
   late final ValueNotifier<Iterable<String>> _filteredDictionariesNotifier;
@@ -23,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    _service = DBService();
     _wordInputController = TextEditingController();
     _dictionaryNameNotifier = ValueNotifier<String?>(null);
     _filteredDictionariesNotifier = ValueNotifier<Iterable<String>>(
@@ -37,6 +42,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _dictionaryNameNotifier.dispose();
     _filteredDictionariesNotifier.dispose();
     super.dispose();
+  }
+
+  Future<void> _addDictionary(String name) async {
+    await _service.ensureDictionary(name);
+    final dict = DBDictionary(name);
+    await dict.initialize();
+    setState(() => widget.dictionaries[name] = dict);
   }
 
   void _gotoWord(BuildContext context, String word, String? dictionaryName) {
@@ -86,14 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: () {
-                  // TODO: Direct update the dictionaries map is not ideal, consider using a state management solution
                   showDialog(
                     context: context,
-                    builder: (_) => TextInputDialog(
-                      onSubmitted: (name) => setState(
-                        () => widget.dictionaries[name] = Dictionary.from([]),
-                      ),
-                    ),
+                    builder: (_) =>
+                        TextInputDialog(onSubmitted: _addDictionary),
                   );
                 },
               ),

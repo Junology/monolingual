@@ -1,5 +1,32 @@
+import 'dart:async';
 import 'package:monolingual/core/radix_tree.dart';
 import 'package:monolingual/core/word_record.dart';
+import 'package:monolingual/service/database.dart';
+
+/// Interface class for dictionaries, i.e., a storage of [WordRecord] objects.
+/// The instances must provide the following methods:
+///
+/// - [add]/[remove]: async add/remove a [WordRecord] from the dictionary.
+/// - [update]: async update an existing [WordRecord] in the dictionary.
+/// - [find]: async find a [WordRecord] by its word.
+/// - [isearch]: **sync** find words by prefix (incremental search).
+abstract interface class Dictionary {
+  FutureOr<void> initialize();
+  FutureOr<void> close();
+
+  FutureOr<WordRecord?> find(String word);
+  // Returns false if a record with the same word already exists.
+  FutureOr<bool> add(WordRecord record);
+  // Returns null if no record with the given word exists.
+  FutureOr<WordRecord?> remove(String word);
+  // Returns false if no record with the given word exists.
+  FutureOr<bool> update(WordRecord record);
+
+  // Sync prefix search; implementations must maintain an in-memory key index.
+  Iterable<String> isearch(String prefix);
+
+  int get size;
+}
 
 class _DictionaryNode {
   final WordRecord record;
@@ -19,18 +46,23 @@ class _DictionaryNode {
 /// ### Implementation details
 /// The class contains [WordRecord] objects in a hashtable with chaining for collision resolution.
 /// A [RadixTree] is maintained as a secondary index for prefix search.
-class Dictionary extends Iterable<WordRecord> {
+class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
   int capacity;
-  int size;
   List<_DictionaryNode?> _buckets;
   final RadixTree _radixTree = RadixTree();
 
-  Dictionary({this.capacity = 16})
+  @override
+  int size;
+
+  InMemoryDictionary({this.capacity = 16})
     : _buckets = List<_DictionaryNode?>.filled(capacity, null),
       size = 0;
 
-  factory Dictionary.from(Iterable<WordRecord> records, {int capacity = 16}) {
-    final dictionary = Dictionary(capacity: capacity);
+  factory InMemoryDictionary.from(
+    Iterable<WordRecord> records, {
+    int capacity = 16,
+  }) {
+    final dictionary = InMemoryDictionary(capacity: capacity);
     for (var record in records) {
       dictionary.add(record);
     }
@@ -65,14 +97,21 @@ class Dictionary extends Iterable<WordRecord> {
     return null;
   }
 
+  @override
+  void initialize() {}
+  @override
+  void close() {}
+
   /// Find a record [WordRecord] by its primary word.
   /// Returns the record if found, otherwise returns null.
+  @override
   WordRecord? find(String word) => _findNode(word, _hash(word))?.record;
 
   /// Updates an existing [WordRecord] in the dictionary.
   /// [record]'s `word` field must match an existing record in the dictionary.
   /// Returns true if the record was updated, false if no record with the given
   /// word exists
+  @override
   bool update(WordRecord record) {
     final index = _hash(record.word);
     final node = _findNode(record.word, index);
@@ -85,6 +124,7 @@ class Dictionary extends Iterable<WordRecord> {
 
   /// Adds a new [WordRecord] to the dictionary.
   /// Returns true if the record was added, false if a record with the same word already exists.
+  @override
   bool add(WordRecord record) {
     final index = _hash(record.word);
 
@@ -103,6 +143,7 @@ class Dictionary extends Iterable<WordRecord> {
 
   /// Removes a [WordRecord] from the dictionary by its word.
   /// Returns true if the record was removed, false if no record with the given word exists.
+  @override
   WordRecord? remove(String word) {
     final index = _hash(word);
     var entry = _buckets[index];
@@ -134,6 +175,7 @@ class Dictionary extends Iterable<WordRecord> {
   }
 
   /// Returns all words starting with [key], in lexicographic order.
+  @override
   Iterable<String> isearch(String key) => _radixTree.wordsWithPrefix(key);
 
   /// Subscript operator to find a [WordRecord] by its primary word.
@@ -183,4 +225,57 @@ class DictionaryIterator implements Iterator<WordRecord> {
 
     return _nextBucket();
   }
+}
+
+class DBDictionary implements Dictionary {
+  final String name;
+  final DBService _service = DBService();
+  final RadixTree _radixTree = RadixTree();
+
+  int _size = 0;
+
+  DBDictionary(this.name);
+
+  @override
+  Future<void> initialize() async {
+    final rows = await _service.wordsInDictionary(name);
+    for (final row in rows) {
+      _radixTree.insert(row);
+    }
+    _size = rows.length;
+  }
+
+  @override
+  void close() {}
+
+  @override
+  Future<WordRecord?> find(String word) => _service.findWord(name, word);
+
+  @override
+  Future<bool> add(WordRecord record) async {
+    final success = await _service.insertWord(name, record);
+    if (!success) return false;
+    _radixTree.insert(record.word);
+    _size++;
+    return true;
+  }
+
+  @override
+  Future<WordRecord?> remove(String word) async {
+    final existing = await find(word);
+    if (existing == null) return null;
+    await _service.removeWord(name, word);
+    _radixTree.delete(word);
+    _size--;
+    return existing;
+  }
+
+  @override
+  Future<bool> update(WordRecord record) => _service.updateWord(name, record);
+
+  @override
+  Iterable<String> isearch(String prefix) => _radixTree.wordsWithPrefix(prefix);
+
+  @override
+  int get size => _size;
 }
