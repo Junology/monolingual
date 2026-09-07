@@ -1,9 +1,12 @@
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AboutDialog;
 import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/core/graph.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
 import 'package:monolingual/ui/text_filter_widget.dart';
+import 'package:monolingual/ui/graphview_widget.dart';
 import 'package:monolingual/ui/dialogs.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -75,6 +78,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Graph<String> graph = Graph<String>(
+      vertices: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+    );
+    HashMap<String, Vector2> graphLayout = HashMap.from({
+      'A': Vector2(0, 0),
+      'B': Vector2(100, 00),
+      'C': Vector2(60, 80),
+      'D': Vector2(-60, 80),
+      'E': Vector2(-100, 0),
+      'F': Vector2(-60, -80),
+      'G': Vector2(60, -80),
+    });
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -149,6 +165,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.subdirectory_arrow_left),
               ),
             ],
+          ),
+          Expanded(
+            child: GraphViewWidget(graph: graph, graphLayout: graphLayout),
           ),
         ],
       ),
