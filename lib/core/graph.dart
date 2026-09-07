@@ -9,7 +9,11 @@ class _MinHeap {
 
   _MinHeap._(this._heap);
 
+  /// Creates an empty min-heap.
   factory _MinHeap.empty() => _MinHeap._([]);
+
+  /// Creates a min-heap from an existing list of elements.
+  // ignore: unused_element
   factory _MinHeap.heapify(List<({int key, int value})> elements) {
     final heap = _MinHeap._(List.from(elements));
     for (int i = (heap._heap.length >> 1) - 1; i >= 0; i--) {
