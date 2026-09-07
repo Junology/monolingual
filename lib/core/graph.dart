@@ -1,5 +1,7 @@
+import 'dart:math';
 import 'dart:collection';
-import 'package:vector_math/vector_math.dart';
+import 'package:flutter/foundation.dart'; // for debug
+import 'package:vector_math/vector_math_64.dart';
 
 /// A basic binary min-heap implementation.
 class _MinHeap {
@@ -7,7 +9,7 @@ class _MinHeap {
 
   _MinHeap._(this._heap);
 
-  factory _MinHeap.empty() => _MinHeap._(const []);
+  factory _MinHeap.empty() => _MinHeap._([]);
   factory _MinHeap.heapify(List<({int key, int value})> elements) {
     final heap = _MinHeap._(List.from(elements));
     for (int i = (heap._heap.length >> 1) - 1; i >= 0; i--) {
@@ -155,16 +157,7 @@ class Graph<V> {
     }).toList();
   }
 
-  /// Compute the shortest path distances from the [source] vertex to all vertices.
-  /// The method is implemented using Dijkstra's algorithm with a priority queue
-  /// built on a simple binary heap.
-  ///
-  /// @returns A [HashMap] mapping each vertex to its shortest path distance from [source].
-  /// @note If a vertex is unreachable from [source], its distance will be set to [maxDistance].
-  HashMap<V, int> dijkstraShortestPath(V source) {
-    final sourceIndex = vertexIndexMap[source];
-    if (sourceIndex == null) return HashMap<V, int>();
-
+  List<int> _dijkstraShortestPathImpl(int sourceIndex) {
     final n = adjacencyList.length;
     final d = List<int>.filled(n, maxDistance);
     final visited = List<bool>.filled(n, false);
@@ -190,6 +183,20 @@ class Graph<V> {
 
       visited[current.value] = true;
     }
+    return d;
+  }
+
+  /// Compute the shortest path distances from the [source] vertex to all vertices.
+  /// The method is implemented using Dijkstra's algorithm with a priority queue
+  /// built on a simple binary heap.
+  ///
+  /// @returns A [HashMap] mapping each vertex to its shortest path distance from [source].
+  /// @note If a vertex is unreachable from [source], its distance will be set to [maxDistance].
+  HashMap<V, int> dijkstraShortestPath(V source) {
+    final sourceIndex = vertexIndexMap[source];
+    if (sourceIndex == null) return HashMap<V, int>();
+
+    final d = _dijkstraShortestPathImpl(sourceIndex);
 
     final result = HashMap<V, int>.fromEntries(
       vertexIndexMap.entries.map((e) => MapEntry(e.key, d[e.value])),
@@ -202,16 +209,217 @@ class Graph<V> {
   /// computed though the other vertices affects the overall layout.
   ///
   /// @param initialPositions A [HashMap] containing the initial positions of vertices.
-  /// @param scale A scaling factor for the layout.
-  /// @param tolerance The convergence tolerance for the algorithm.
+  /// @param kk The strength of the spring.
+  /// @param maxIterations The maximum number of iterations for the algorithm.
+  /// If not specified, it will default to [initialPositions.length * 1000].
+  /// @param tolerance The convergence tolerance for the algorithm. If not
+  /// specified, it will default to 2^-22 (cf. ULP for 32bit floating-point numbers is 2^-23).
   /// @returns A [HashMap] mapping each vertex to its 2D position as a [Vector2].
   HashMap<V, Vector2> kamadaKawaiLayout(
     HashMap<V, Vector2> initialPositions, {
-    required double scale,
-    double tolerance = 1e-8,
+    required double kk,
+    int? maxIterations,
+    double tolerance = 1.0 / (1 << 22),
   }) {
-    HashMap<V, Vector2> positions = HashMap<V, Vector2>.from(initialPositions);
-    // TODO: Implementation of the Kamada-Kawai algorithm would go here.
-    return positions;
+    maxIterations ??= initialPositions.length * 100;
+
+    final List<V> vertices = initialPositions.keys.toList(growable: false);
+    final List<int> indices = vertices
+        .map((v) => vertexIndexMap[v]!)
+        .toList(growable: false);
+
+    // Compute all-pairs shortest path distances
+    double diameter = 0.0;
+    final dist = List.generate(vertices.length, (i) {
+      final sssp = _dijkstraShortestPathImpl(indices[i]);
+      return List<double>.generate(vertices.length, (j) {
+        final d = sssp[indices[j]].toDouble();
+        if (d > diameter) diameter = d;
+        return d;
+      }, growable: false);
+    }, growable: false);
+
+    // If the graph is degenerated, return a copy of the initial positions.
+    if (diameter < tolerance) {
+      return HashMap.from(initialPositions);
+    }
+
+    // The threshold for considering the system to have reached equilibrium.
+    final double threshold = diameter * tolerance;
+
+    // The constant $L$ in the Kamada-Kawai original article.
+    final ll = sqrt(vertices.length) / diameter;
+    // The constant $l_{ij}$ in the Kamada-Kawai original article.
+    final springLength = List.generate(
+      vertices.length,
+      (i) => List.generate(
+        vertices.length,
+        (j) => ll * dist[i][j],
+        growable: false,
+      ),
+      growable: false,
+    );
+    // The constant $k_{ij}$ in the Kamada-Kawai original article.
+    final springCoeff = List.generate(
+      vertices.length,
+      (i) => List.generate(
+        vertices.length,
+        (j) => dist[i][j] == 0 ? 0.0 : kk / (dist[i][j] * dist[i][j]),
+        growable: false,
+      ),
+      growable: false,
+    );
+
+    // Initialize vertex positions
+    final List<Vector2> positions = List.generate(
+      vertices.length,
+      (i) => initialPositions[vertices[i]]!,
+      growable: false,
+    );
+
+    // The following iteration goes on until the system reaches "equilibrium".
+    // Here, a *pointwise* Newton-Raphson method is applied to find the layout
+    // on which the gradient of the energy function (aka. the *force*) vanishes.
+    // Hence, the "equilibrium" means that the updating of vertex positions
+    // doesn't improve the size of the gradient.
+    //
+    // More precisely, each iteration step consists of the following:
+    //
+    // 1. Compute the force vectors applied to each vertex and find the vertex
+    //    experiencing the maximum force.
+    //    - Set `iMax` to the index of this vertex and `grad` the force vector.
+    //    - If the size of `grad` (the force) doesn't exceed the maximum in the
+    //      previous iteration (`maxDelta`), the system has reached equilibrium.
+    //    - In this case, the iteration is terminated.
+    // 2. Update the chosen vertex using the Newton-Raphson method until it
+    //    reaches equilibrium.
+    //    - Compute the update vector $u$ by solving $Ju = -\text{grad}$, where
+    //      $J$ is the Jacobian matrix of the (pointwise) gradient of the energy
+    //      function (seen as $\text{grad}:\mathbb R^2\to\mathbb R^2$).
+    //    - Update `positions[iMax]` by adding the update vector $u$.
+    //    - Re-calculate the (pointwise) gradient vector at the chosen vertex.
+    //    - If the size of the gradient vector is not improved (i.e. not smaller)
+    //      than the one in the previous inner iteration, this pointwise
+    //      Newton-Raphson iteration has reached equilibrium, so the inner loop
+    //      is terminated.
+    //    - Otherwise, repeat the above inner loop.
+    for (int itrCount = 0; itrCount < maxIterations; ++itrCount) {
+      // Compute force vectors, and determine the vertex with the maximum force
+      int iMax = 0;
+      Vector2 maxGrad = Vector2.zero();
+      double maxDelta = 0.0;
+
+      for (int i = 0; i < vertices.length; ++i) {
+        final grad = Vector2.zero();
+        for (int j = 0; j < vertices.length; ++j) {
+          if (i == j) continue;
+
+          final diff = positions[i] - positions[j];
+          final unitDiff = diff.normalized();
+
+          grad.add((diff - unitDiff * springLength[i][j]) * springCoeff[i][j]);
+        }
+
+        final delta = grad.length;
+
+        if (delta > maxDelta) {
+          maxDelta = delta;
+          iMax = i;
+          maxGrad = grad;
+        }
+      }
+
+      // Terminate the iteration when the positions reached around equilibrium.
+      if (maxDelta < threshold) {
+        break;
+      }
+
+      // Apply Newton-Raphson method to the chosen vertex
+      while (true) {
+        double xx = 0.0, xy = 0.0, yy = 0.0;
+        for (int i = 0; i < vertices.length; ++i) {
+          if (i == iMax) continue;
+
+          final diff = positions[iMax] - positions[i];
+          final length1 = diff.length;
+          final length3 = length1 * diff.length2;
+
+          if (length1 < tolerance) continue;
+
+          xx +=
+              springCoeff[iMax][i] *
+              (1.0 - springLength[iMax][i] * diff.y * diff.y / length3);
+          xy +=
+              springCoeff[iMax][i] *
+              springLength[iMax][i] *
+              diff.x *
+              diff.y /
+              length3;
+          yy +=
+              springCoeff[iMax][i] *
+              (1.0 - springLength[iMax][i] * diff.x * diff.x / length3);
+        }
+
+        final double det = xx * yy - xy * xy;
+        late final Vector2 update;
+        if (det.abs() < tolerance * tolerance) {
+          update = -maxGrad.scaled(1.0 / (xx + yy));
+        } else {
+          // Solve the linear system $Ju=-grad$ to compute the update vector.
+          update = Vector2(
+            (-yy * maxGrad.x + xy * maxGrad.y) / det,
+            (xy * maxGrad.x - xx * maxGrad.y) / det,
+          );
+        }
+
+        // Update the position
+        positions[iMax] += update;
+
+        // Update the maximum force and gradient for the next iteration
+        maxGrad = Vector2.zero();
+        for (int i = 0; i < vertices.length; ++i) {
+          if (i == iMax) continue;
+
+          final diff = positions[iMax] - positions[i];
+          final unitDiff = diff.normalized();
+          maxGrad.add(
+            (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
+          );
+        }
+        final newDelta = maxGrad.length;
+
+        // Terminate the inner loop if the gradient reaches below the tolerance.
+        if (newDelta < threshold) break;
+
+        // If the new gradient is larger than the previous maximum, fall back to
+        // linear estimate of the update vector.
+        if (newDelta >= maxDelta) {
+          positions[iMax] -= update.scaled(newDelta / (newDelta + maxDelta));
+
+          // Update the maximum force and gradient for the next iteration
+          maxGrad = Vector2.zero();
+          for (int i = 0; i < vertices.length; ++i) {
+            if (i == iMax) continue;
+
+            final diff = positions[iMax] - positions[i];
+            final unitDiff = diff.normalized();
+            maxGrad.add(
+              (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
+            );
+          }
+          maxDelta = maxGrad.length;
+        } else {
+          maxDelta = newDelta;
+        }
+      }
+
+      if (itrCount + 1 >= maxIterations) {
+        if (kDebugMode) {
+          print('The loop has reached the maximum number of iterations.');
+        }
+      }
+    }
+
+    return HashMap<V, Vector2>.fromIterables(vertices, positions);
   }
 }
