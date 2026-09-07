@@ -3,6 +3,8 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart'; // for debug
 import 'package:vector_math/vector_math_64.dart';
 
+export 'package:vector_math/vector_math_64.dart' show Vector2;
+
 /// A basic binary min-heap implementation.
 class _MinHeap {
   final List<({int key, int value})> _heap;
