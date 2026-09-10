@@ -81,6 +81,12 @@ class _HomeScreenState extends State<HomeScreen> {
     Graph<String> graph = Graph<String>(
       vertices: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
     );
+    graph.addEdge('A', 'B', 2);
+    graph.addEdge('A', 'C', 3);
+    graph.addEdge('B', 'D', 4);
+    graph.addEdge('C', 'E', 5);
+    graph.addEdge('D', 'F', 6);
+    graph.addEdge('E', 'G', 7);
     HashMap<String, Vector2> graphLayout = HashMap.from({
       'A': Vector2(0, 0),
       'B': Vector2(100, 00),
@@ -167,7 +173,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           Expanded(
-            child: GraphViewWidget(graph: graph, graphLayout: graphLayout),
+            child: GraphViewWidget(
+              graph: graph,
+              graphLayout: graphLayout,
+              vertexBuilder: (BuildContext context, String vertex) {
+                return Chip(
+                  label: Text(vertex),
+                  padding: const EdgeInsets.all(0.0),
+                  side: const BorderSide(color: Colors.blue, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
