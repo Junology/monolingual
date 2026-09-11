@@ -7,7 +7,7 @@ import 'package:monolingual/core/graph.dart';
 /// Only vertices with coordinates specified in the [graphLayout] will be rendered.
 class GraphViewWidget<V> extends RenderObjectWidget {
   final Graph<V> _graph;
-  final HashMap<V, Vector2> _graphLayout;
+  final HashMap<V, GraphVertex> _graphLayout;
   final Widget Function(BuildContext context, V vertex) _vertexBuilder;
 
   const GraphViewWidget({
@@ -146,7 +146,7 @@ class GraphViewElement<V> extends RenderObjectElement {
 /// RenderObject corresponding to [GraphViewWidget].
 class GraphRenderObject<V> extends RenderBox {
   Graph<V> _graph;
-  HashMap<V, Vector2> _graphLayout;
+  HashMap<V, GraphVertex> _graphLayout;
   final HashMap<V, RenderObject> _slotToChild = HashMap<V, RenderObject>();
 
   Iterable<V> get slots => _slotToChild.keys;
@@ -161,8 +161,8 @@ class GraphRenderObject<V> extends RenderBox {
     markNeedsLayout();
   }
 
-  HashMap<V, Vector2> get graphLayout => _graphLayout;
-  set graphLayout(HashMap<V, Vector2> value) {
+  HashMap<V, GraphVertex> get graphLayout => _graphLayout;
+  set graphLayout(HashMap<V, GraphVertex> value) {
     if (value == _graphLayout) return;
     _graphLayout = value;
     markNeedsLayout();

@@ -87,14 +87,14 @@ class _HomeScreenState extends State<HomeScreen> {
     graph.addEdge('C', 'E', 5);
     graph.addEdge('D', 'F', 6);
     graph.addEdge('E', 'G', 7);
-    HashMap<String, Vector2> graphLayout = HashMap.from({
-      'A': Vector2(0, 0),
-      'B': Vector2(100, 00),
-      'C': Vector2(60, 80),
-      'D': Vector2(-60, 80),
-      'E': Vector2(-100, 0),
-      'F': Vector2(-60, -80),
-      'G': Vector2(60, -80),
+    HashMap<String, GraphVertex> graphLayout = HashMap.from({
+      'A': GraphVertex(0, 0),
+      'B': GraphVertex(100, 00),
+      'C': GraphVertex(60, 80),
+      'D': GraphVertex(-60, 80),
+      'E': GraphVertex(-100, 0),
+      'F': GraphVertex(-60, -80),
+      'G': GraphVertex(60, -80),
     });
 
     return Scaffold(

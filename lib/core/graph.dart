@@ -3,7 +3,7 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart'; // for debug
 import 'package:vector_math/vector_math_64.dart';
 
-export 'package:vector_math/vector_math_64.dart' show Vector2;
+typedef GraphVertex = Vector2;
 
 /// A basic binary min-heap implementation.
 class _MinHeap {
@@ -254,9 +254,9 @@ class Graph<V> {
   /// If not specified, it will default to [initialPositions.length * 1000].
   /// @param tolerance The convergence tolerance for the algorithm. If not
   /// specified, it will default to 2^-22 (cf. ULP for 32bit floating-point numbers is 2^-23).
-  /// @returns A [HashMap] mapping each vertex to its 2D position as a [Vector2].
-  HashMap<V, Vector2> kamadaKawaiLayout(
-    HashMap<V, Vector2> initialPositions, {
+  /// @returns A [HashMap] mapping each vertex to its 2D position as a [GraphVertex].
+  HashMap<V, GraphVertex> kamadaKawaiLayout(
+    HashMap<V, GraphVertex> initialPositions, {
     required double kk,
     int? maxIterations,
     double tolerance = 1.0 / (1 << 22),
@@ -311,7 +311,7 @@ class Graph<V> {
     );
 
     // Initialize vertex positions
-    final List<Vector2> positions = List.generate(
+    final List<GraphVertex> positions = List.generate(
       vertices.length,
       (i) => initialPositions[vertices[i]]!,
       growable: false,
@@ -346,11 +346,11 @@ class Graph<V> {
     for (int itrCount = 0; itrCount < maxIterations; ++itrCount) {
       // Compute force vectors, and determine the vertex with the maximum force
       int iMax = 0;
-      Vector2 maxGrad = Vector2.zero();
+      GraphVertex maxGrad = GraphVertex.zero();
       double maxDelta = 0.0;
 
       for (int i = 0; i < vertices.length; ++i) {
-        final grad = Vector2.zero();
+        final grad = GraphVertex.zero();
         for (int j = 0; j < vertices.length; ++j) {
           if (i == j) continue;
 
@@ -401,12 +401,12 @@ class Graph<V> {
         }
 
         final double det = xx * yy - xy * xy;
-        late final Vector2 update;
+        late final GraphVertex update;
         if (det.abs() < tolerance * tolerance) {
           update = -maxGrad.scaled(1.0 / (xx + yy));
         } else {
           // Solve the linear system $Ju=-grad$ to compute the update vector.
-          update = Vector2(
+          update = GraphVertex(
             (-yy * maxGrad.x + xy * maxGrad.y) / det,
             (xy * maxGrad.x - xx * maxGrad.y) / det,
           );
@@ -416,7 +416,7 @@ class Graph<V> {
         positions[iMax] += update;
 
         // Update the maximum force and gradient for the next iteration
-        maxGrad = Vector2.zero();
+        maxGrad = GraphVertex.zero();
         for (int i = 0; i < vertices.length; ++i) {
           if (i == iMax) continue;
 
@@ -437,7 +437,7 @@ class Graph<V> {
           positions[iMax] -= update.scaled(newDelta / (newDelta + maxDelta));
 
           // Update the maximum force and gradient for the next iteration
-          maxGrad = Vector2.zero();
+          maxGrad = GraphVertex.zero();
           for (int i = 0; i < vertices.length; ++i) {
             if (i == iMax) continue;
 
@@ -460,6 +460,6 @@ class Graph<V> {
       }
     }
 
-    return HashMap<V, Vector2>.fromIterables(vertices, positions);
+    return HashMap<V, GraphVertex>.fromIterables(vertices, positions);
   }
 }
