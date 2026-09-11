@@ -88,9 +88,13 @@ class Graph<V> {
   /// The maximum distance value used to represent "infinity" in shortest path calculations.
   static const int maxDistance = 1 << 52;
 
-  final List<({V key, List<({int target, int weight})> adjacency})> _nodes;
+  final List<({V key, Map<int, int> adjacency})> _nodes;
   final HashMap<V, int> _vertexIndexMap;
 
+  /// The constructor for internal use
+  Graph._internal(this._nodes, this._vertexIndexMap);
+
+  /// Create a graph with the given set of vertices.
   Graph({Iterable<V> vertices = const []})
     : _nodes = [],
       _vertexIndexMap = HashMap() {
@@ -101,12 +105,9 @@ class Graph<V> {
 
   /// Deep copy constructor.
   Graph.from(Graph<V> other)
-    : _nodes = List<({V key, List<({int target, int weight})> adjacency})>.from(
+    : _nodes = List<({V key, Map<int, int> adjacency})>.from(
         other._nodes.map(
-          (e) => (
-            key: e.key,
-            adjacency: List<({int target, int weight})>.from(e.adjacency),
-          ),
+          (e) => (key: e.key, adjacency: Map<int, int>.from(e.adjacency)),
         ),
       ),
       _vertexIndexMap = HashMap.from(other._vertexIndexMap);
@@ -120,9 +121,9 @@ class Graph<V> {
   Iterable<({V source, V target, int weight})> get edges sync* {
     for (final node in _nodes) {
       final source = node.key;
-      for (final edge in node.adjacency) {
-        final target = _nodes[edge.target].key;
-        final weight = edge.weight;
+      for (final edge in node.adjacency.entries) {
+        final target = _nodes[edge.key].key;
+        final weight = edge.value;
         yield (source: source, target: target, weight: weight);
       }
     }
@@ -133,7 +134,7 @@ class Graph<V> {
 
   void _addVertexInternal(V vertex) {
     _vertexIndexMap[vertex] = _nodes.length;
-    _nodes.add((key: vertex, adjacency: []));
+    _nodes.add((key: vertex, adjacency: {}));
   }
 
   /// Add a vertex to the graph. Do nothing when the vertex already exists.
@@ -158,7 +159,7 @@ class Graph<V> {
     final targetIndex = _vertexIndexMap[target];
     if (sourceIndex == null || targetIndex == null) return false;
 
-    _nodes[sourceIndex].adjacency.add((target: targetIndex, weight: weight));
+    _nodes[sourceIndex].adjacency[targetIndex] = weight;
     return true;
   }
 
@@ -173,8 +174,8 @@ class Graph<V> {
     final targetIndex = _vertexIndexMap[target];
     if (sourceIndex == null || targetIndex == null) return false;
 
-    _nodes[sourceIndex].adjacency.add((target: targetIndex, weight: weight));
-    _nodes[targetIndex].adjacency.add((target: sourceIndex, weight: weight));
+    _nodes[sourceIndex].adjacency[targetIndex] = weight;
+    _nodes[targetIndex].adjacency[sourceIndex] = weight;
     return true;
   }
 
@@ -188,12 +189,14 @@ class Graph<V> {
 
     _nodes[vertexIndex] = (
       key: vertex,
-      adjacency: edges.map((e) {
-        final targetIndex = _vertexIndexMap[e.target];
-        if (targetIndex == null) throw ArgumentError('Unknown target vertex.');
+      adjacency: Map.fromEntries(
+        edges.map((e) {
+          final targetIndex = _vertexIndexMap[e.target];
+          assert(targetIndex != null);
 
-        return (target: targetIndex, weight: e.weight);
-      }).toList(),
+          return MapEntry(targetIndex!, e.weight);
+        }),
+      ),
     );
   }
 
@@ -211,9 +214,9 @@ class Graph<V> {
 
       if (visited[current.value]) continue;
 
-      for (final edge in _nodes[current.value].adjacency) {
-        final next = edge.target;
-        final weight = edge.weight;
+      for (final edge in _nodes[current.value].adjacency.entries) {
+        final next = edge.key;
+        final weight = edge.value;
         final dNext = d[current.value] + weight;
         if (dNext < d[next]) {
           d[next] = dNext;
