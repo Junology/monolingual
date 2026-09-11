@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:monolingual/core/graph.dart';
 import 'package:vector_math/vector_math_64.dart';
@@ -122,5 +123,131 @@ void main() {
         expect(d, closeTo(edges[0], eps));
       }
     });
+  });
+
+  group('Graph equality and hashCode', () {
+    test('empty graphs are equal', () {
+      final a = Graph<String>();
+      final b = Graph<String>();
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test('vertex insertion order does not affect equality', () {
+      final a = Graph<String>(vertices: ['X', 'Y', 'Z']);
+      final b = Graph<String>(vertices: ['Z', 'X', 'Y']);
+      expect(a, equals(b));
+      expect(a.hashCode, equals(b.hashCode));
+    });
+
+    test(
+      'graphs with same directed edges are equal regardless of build order',
+      () {
+        final a = Graph<String>(vertices: ['A', 'B', 'C']);
+        a.addEdge('A', 'B', 3);
+        a.addEdge('B', 'C', 5);
+
+        final b = Graph<String>(vertices: ['C', 'A', 'B']);
+        b.addEdge('B', 'C', 5);
+        b.addEdge('A', 'B', 3);
+
+        expect(a, equals(b));
+        expect(a.hashCode, equals(b.hashCode));
+      },
+    );
+
+    test('Graph.from copy equals the original', () {
+      final original = Graph<String>(vertices: ['A', 'B', 'C']);
+      original.addBidirectionalEdge('A', 'B', 7);
+      original.addEdge('B', 'C', 3);
+
+      final copy = Graph.from(original);
+      expect(copy, equals(original));
+      expect(copy.hashCode, equals(original.hashCode));
+    });
+
+    test('graphs with different vertices are not equal', () {
+      final a = Graph<String>(vertices: ['A', 'B']);
+      final b = Graph<String>(vertices: ['A', 'C']);
+      expect(a, isNot(equals(b)));
+    });
+
+    test('graphs with different edge weights are not equal', () {
+      final a = Graph<String>(vertices: ['A', 'B']);
+      a.addEdge('A', 'B', 1);
+
+      final b = Graph<String>(vertices: ['A', 'B']);
+      b.addEdge('A', 'B', 2);
+
+      expect(a, isNot(equals(b)));
+    });
+
+    test(
+      'directed and undirected edge between same vertices are not equal',
+      () {
+        final directed = Graph<String>(vertices: ['A', 'B']);
+        directed.addEdge('A', 'B', 4);
+
+        final undirected = Graph<String>(vertices: ['A', 'B']);
+        undirected.addBidirectionalEdge('A', 'B', 4);
+
+        expect(directed, isNot(equals(undirected)));
+      },
+    );
+  });
+
+  group('Graph.disoriented equality and hashCode', () {
+    test('disoriented of a bidirectional graph equals the original', () {
+      final graph = Graph<String>(vertices: ['A', 'B', 'C']);
+      graph.addBidirectionalEdge('A', 'B', 4);
+      graph.addBidirectionalEdge('B', 'C', 6);
+
+      final dis = graph.disoriented(min);
+
+      expect(dis, equals(graph));
+    });
+
+    test('disoriented adds reverse edges for one-way edges', () {
+      final directed = Graph<String>(vertices: ['A', 'B']);
+      directed.addEdge('A', 'B', 5);
+
+      final expected = Graph<String>(vertices: ['A', 'B']);
+      expected.addBidirectionalEdge('A', 'B', 5);
+
+      final dis = directed.disoriented(min);
+
+      expect(dis, equals(expected));
+    });
+
+    test('disoriented merges opposite edges using mergeOp', () {
+      final graph = Graph<String>(vertices: ['A', 'B']);
+      graph.addEdge('A', 'B', 3);
+      graph.addEdge('B', 'A', 7);
+
+      final expected = Graph<String>(vertices: ['A', 'B']);
+      expected.addBidirectionalEdge('A', 'B', 10);
+
+      final dis = graph.disoriented((x, y) => x + y);
+
+      expect(dis, equals(expected));
+    });
+
+    test(
+      'disoriented graphs built from equivalent directed graphs are equal',
+      () {
+        final a = Graph<String>(vertices: ['X', 'Y', 'Z']);
+        a.addEdge('X', 'Y', 2);
+        a.addEdge('Y', 'Z', 4);
+
+        final b = Graph<String>(vertices: ['Z', 'X', 'Y']);
+        b.addEdge('Y', 'Z', 4);
+        b.addEdge('X', 'Y', 2);
+
+        final da = a.disoriented(min);
+        final db = b.disoriented(min);
+
+        expect(da, equals(db));
+      },
+    );
   });
 }

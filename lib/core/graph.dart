@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:collection';
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart'; // for debug
 import 'package:vector_math/vector_math_64.dart';
 
@@ -132,6 +133,26 @@ class Graph<V> {
   int get edgeCount =>
       _nodes.fold(0, (count, node) => count + node.adjacency.length);
 
+  @override
+  int get hashCode => Object.hash(
+    UnorderedIterableEquality<V>().hash(_vertexIndexMap.keys),
+    UnorderedIterableEquality<({V source, V target, int weight})>().hash(edges),
+  );
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! Graph<V>) return false;
+    return UnorderedIterableEquality<V>().equals(
+          _vertexIndexMap.keys,
+          other._vertexIndexMap.keys,
+        ) &&
+        UnorderedIterableEquality<({V source, V target, int weight})>().equals(
+          edges,
+          other.edges,
+        );
+  }
+
   void _addVertexInternal(V vertex) {
     _vertexIndexMap[vertex] = _nodes.length;
     _nodes.add((key: vertex, adjacency: {}));
@@ -200,6 +221,43 @@ class Graph<V> {
     );
   }
 
+  /// Create a graph that forgets the orientation.
+  /// Hence, in the resulting graph, every edge is bidirectional in the sense that
+  /// if $(u,v)$ is an edge with weight $a$, then $(v,u)$ is also an edge with
+  /// the same weight $a$.
+  /// If an edge is already bidirectional, the weights for the edge and its
+  /// reverse edge are merged into a common value with `mergeOp`.
+  ///
+  /// @param mergeOp A function to merge the weights of edges that become bidirectional.
+  /// @returns A new [Graph] instance with all edges made bidirectional.
+  /// @warning Be aware that the order of weights passed to `mergeOp` is
+  /// unspecified. Hence, it is always preferred that `mergeOp` is a commutative
+  /// operation.
+  Graph<V> disoriented(int Function(int, int) mergeOp) {
+    final newNodes = _nodes
+        .map((node) => (key: node.key, adjacency: <int, int>{}))
+        .toList();
+
+    for (int i = 0; i < _nodes.length; ++i) {
+      for (final entry in _nodes[i].adjacency.entries) {
+        final j = entry.key;
+        final weight = entry.value;
+        final invWeight = newNodes[i].adjacency[j];
+
+        if (invWeight != null) {
+          final newWeight = mergeOp(weight, invWeight);
+          newNodes[i].adjacency[j] = newWeight;
+          newNodes[j].adjacency[i] = newWeight;
+        } else {
+          newNodes[i].adjacency[j] = weight;
+          newNodes[j].adjacency[i] = weight;
+        }
+      }
+    }
+
+    return Graph<V>._internal(newNodes, HashMap<V, int>.from(_vertexIndexMap));
+  }
+
   List<int> _dijkstraShortestPathImpl(int sourceIndex) {
     final n = _nodes.length;
     final d = List<int>.filled(n, maxDistance);
@@ -258,6 +316,8 @@ class Graph<V> {
   /// @param tolerance The convergence tolerance for the algorithm. If not
   /// specified, it will default to 2^-22 (cf. ULP for 32bit floating-point numbers is 2^-23).
   /// @returns A [HashMap] mapping each vertex to its 2D position as a [GraphVertex].
+  /// @warning If the graph is not strongly connected, the computation diverges
+  /// and may not produce a valid layout.
   HashMap<V, GraphVertex> kamadaKawaiLayout(
     HashMap<V, GraphVertex> initialPositions, {
     required double kk,
