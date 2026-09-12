@@ -54,11 +54,13 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
   void didUpdateWidget(covariant TextFilterWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.filteredItemsNotifier != oldWidget.filteredItemsNotifier) {
+      final oldValue = _filteredItemsNotifier.value;
       if (widget.filteredItemsNotifier == null) {
         _filteredItemsNotifier.dispose();
       }
       _filteredItemsNotifier =
           widget.filteredItemsNotifier ?? ValueNotifier(widget.items);
+      _filteredItemsNotifier.value = oldValue;
     }
     if (widget.focusNode != oldWidget.focusNode) {
       if (widget.focusNode == null) {

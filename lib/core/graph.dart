@@ -153,6 +153,18 @@ class Graph<V> {
         );
   }
 
+  /// Check if the graph contains the given [vertex].
+  bool containsVertex(V vertex) => _vertexIndexMap.containsKey(vertex);
+
+  /// Get the weight of the edge from [source] to [target].
+  /// Returns `null` if either vertex does not exist or there is no edge between them.
+  int? getWeight(V source, V target) {
+    final sourceIndex = _vertexIndexMap[source];
+    final targetIndex = _vertexIndexMap[target];
+    if (sourceIndex == null || targetIndex == null) return null;
+    return _nodes[sourceIndex].adjacency[targetIndex];
+  }
+
   void _addVertexInternal(V vertex) {
     _vertexIndexMap[vertex] = _nodes.length;
     _nodes.add((key: vertex, adjacency: {}));

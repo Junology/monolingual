@@ -2,11 +2,10 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AboutDialog;
 import 'package:monolingual/core/dictionary.dart';
-import 'package:monolingual/core/graph.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
 import 'package:monolingual/ui/word_input_widget.dart';
 import 'package:monolingual/ui/text_filter_widget.dart';
-import 'package:monolingual/ui/graphview_widget.dart';
+import 'package:monolingual/ui/synonym_view_widget.dart';
 import 'package:monolingual/ui/dialogs.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,8 +20,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final TextEditingController _wordInputController;
   late final ValueNotifier<String?> _dictionaryNameNotifier;
+
+  // [ValueNotifier] for the list of the names of dictionaries that match the
+  // current filter in [_dictionaryNameNotifier] and contains the word specified
+  // as the value of [_wordInputController].
   late final ValueNotifier<Iterable<String>> _filteredDictionariesNotifier;
 
+  late final ValueNotifier<({Dictionary dictionary, String word})?>
+  _wordNotifier;
   @override
   void initState() {
     super.initState();
@@ -32,16 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _filteredDictionariesNotifier = ValueNotifier<Iterable<String>>(
       widget.dictionaries.keys,
     );
-    _filteredDictionariesNotifier.addListener(() {
-      // If the current selected dictionary for the word does not meet
-      // the constraints of the filter, then reset it.
-      if (!_filteredDictionariesNotifier.value.contains(
-        _dictionaryNameNotifier.value,
-      )) {
-        _dictionaryNameNotifier.value = null;
-      }
-      setState(() {});
-    });
+    _wordNotifier = ValueNotifier<({Dictionary dictionary, String word})?>(
+      null,
+    );
   }
 
   @override
@@ -49,7 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _wordInputController.dispose();
     _dictionaryNameNotifier.dispose();
     _filteredDictionariesNotifier.dispose();
+    _wordNotifier.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.dictionaries != oldWidget.dictionaries) {
+      _filteredDictionariesNotifier.value = widget.dictionaries.keys;
+    }
   }
 
   Future<void> _addDictionary(String name) async {
@@ -60,43 +67,26 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => widget.dictionaries[name] = dict);
   }
 
-  void _gotoWord(BuildContext context, String word, String? dictionaryName) {
+  void _updateDisplayedWord(String word, String? dictionaryName) {
     dictionaryName ??= _filteredDictionariesNotifier.value.singleOrNull;
-    if (dictionaryName == null) return;
 
+    debugPrint(
+      'Updating displayed word: $word, dictionaryName: $dictionaryName',
+    );
+    if (dictionaryName == null || word.isEmpty) return;
     final dictionary = widget.dictionaries[dictionaryName];
+    if (dictionary == null) return;
 
-    if (dictionary == null) {
-      if (kDebugMode) {
-        debugPrint('Unknown dictionary name: $dictionaryName');
-      }
-      return;
-    }
+    _wordNotifier.value = (dictionary: dictionary, word: word);
+  }
 
+  void _gotoWord(BuildContext context, String word, Dictionary dictionary) {
+    debugPrint('Word tapped: $word');
     Navigator.push(context, WordViewScreen(dictionary: dictionary, word: word));
   }
 
   @override
   Widget build(BuildContext context) {
-    Graph<String> graph = Graph<String>(
-      vertices: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
-    );
-    graph.addEdge('A', 'B', 2);
-    graph.addEdge('A', 'C', 3);
-    graph.addEdge('B', 'D', 4);
-    graph.addEdge('C', 'E', 5);
-    graph.addEdge('D', 'F', 6);
-    graph.addEdge('E', 'G', 7);
-    HashMap<String, GraphVertex> graphLayout = HashMap.from({
-      'A': GraphVertex(0, 0),
-      'B': GraphVertex(100, 00),
-      'C': GraphVertex(60, 80),
-      'D': GraphVertex(-60, 80),
-      'E': GraphVertex(-100, 0),
-      'F': GraphVertex(-60, -80),
-      'G': GraphVertex(60, -80),
-    });
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
@@ -139,31 +129,29 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Icon(Icons.search),
               Expanded(
-                child: WordInputField(
-                  wordIndexMap: Map.fromEntries(
-                    _filteredDictionariesNotifier.value
-                        .where(
-                          (dictName) =>
-                              widget.dictionaries.containsKey(dictName),
-                        )
-                        .map(
+                child: ValueListenableBuilder<Iterable<String>>(
+                  valueListenable: _filteredDictionariesNotifier,
+                  builder: (context, filteredDictionaries, child) {
+                    return WordInputField(
+                      wordIndexMap: Map.fromEntries(
+                        filteredDictionaries.map(
                           (dictName) => MapEntry(
                             dictName,
                             widget.dictionaries[dictName]!.isearch,
                           ),
                         ),
-                  ),
-                  showDictionaryName: true,
-                  onSubmitted: (value, dictionaryName) =>
-                      _gotoWord(context, value, dictionaryName),
-                  textEditingController: _wordInputController,
-                  dictionaryNameNotifier: _dictionaryNameNotifier,
+                      ),
+                      showDictionaryName: true,
+                      onSubmitted: _updateDisplayedWord,
+                      textEditingController: _wordInputController,
+                      dictionaryNameNotifier: _dictionaryNameNotifier,
+                    );
+                  },
                 ),
               ),
               IconButton(
                 onPressed: () {
-                  _gotoWord(
-                    context,
+                  _updateDisplayedWord(
                     _wordInputController.text,
                     _dictionaryNameNotifier.value,
                   );
@@ -173,17 +161,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           Expanded(
-            child: GraphViewWidget(
-              graph: graph,
-              graphLayout: graphLayout,
-              vertexBuilder: (BuildContext context, String vertex) {
-                return Chip(
-                  label: Text(vertex),
-                  padding: const EdgeInsets.all(0.0),
-                  side: const BorderSide(color: Colors.blue, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
+            child: ValueListenableBuilder(
+              valueListenable: _wordNotifier,
+              builder: (context, value, child) {
+                if (value == null) {
+                  return const SizedBox.shrink();
+                }
+                return SynonymView(
+                  dictionary: value.dictionary,
+                  word: value.word,
+                  searchDepth: 3,
+                  visibleDepth: 2,
+                  onWordTapped: (word) =>
+                      _gotoWord(context, word, value.dictionary),
+                  scale: 100,
                 );
               },
             ),

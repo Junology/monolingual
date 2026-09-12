@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:monolingual/core/graph.dart';
@@ -93,9 +94,11 @@ class GraphViewElement<V> extends RenderObjectElement {
     _slotToChild = HashMap<V, Element>();
     final oldKeyedElements = _keyedChildren;
     _keyedChildren = {};
-    for (final vertex in widget._graph.vertices) {
-      final built = widget._vertexBuilder(this, vertex);
-      final newWidgetKey = built.key;
+    for (final vertex in widget._graphLayout.keys) {
+      final built = widget._graph.containsVertex(vertex)
+          ? widget._vertexBuilder(this, vertex)
+          : null;
+      final newWidgetKey = built?.key;
 
       final oldSlotChild = oldSlotToChildren[vertex];
       final oldKeyedChild = newWidgetKey != null
@@ -126,14 +129,20 @@ class GraphViewElement<V> extends RenderObjectElement {
   @override
   void insertRenderObjectChild(RenderBox child, V slot) {
     renderObject._setChild(child, slot);
-    assert(renderObject._slotToChild[slot] == child);
+    assert(
+      renderObject._slotToChild[slot] == child,
+      'Child for slot $slot was not correctly inserted.',
+    );
   }
 
   @override
   void removeRenderObjectChild(RenderBox child, V slot) {
     if (renderObject._slotToChild[slot] == child) {
       renderObject._setChild(null, slot);
-      assert(renderObject._slotToChild[slot] == null);
+      assert(
+        renderObject._slotToChild[slot] == null,
+        'Child for slot $slot was not correctly removed.',
+      );
     }
   }
 
@@ -220,8 +229,11 @@ class GraphRenderObject<V> extends RenderBox {
     final Canvas canvas = context.canvas;
     canvas.clipRect(offset & size, doAntiAlias: false);
     for (final edge in _graph.edges) {
-      final sourcePos = _graphLayout[edge.source]!;
-      final targetPos = _graphLayout[edge.target]!;
+      final sourcePos = _graphLayout[edge.source];
+      final targetPos = _graphLayout[edge.target];
+
+      if (sourcePos == null || targetPos == null) continue;
+
       canvas.drawLine(
         Offset(sourcePos.x, sourcePos.y) + size.center(offset),
         Offset(targetPos.x, targetPos.y) + size.center(offset),
@@ -249,17 +261,42 @@ class GraphRenderObject<V> extends RenderBox {
     }
   }
 
-  void _setChild(RenderBox? child, V slot) {
-    if (!_graphLayout.containsKey(slot)) return;
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    for (final entry in _slotToChild.entries) {
+      final child = entry.value as RenderBox;
+      final childParentData = child.parentData! as BoxParentData;
+      final childOffset = childParentData.offset;
+      if (result.addWithPaintOffset(
+        offset: childOffset,
+        position: position,
+        hitTest: (result, transformed) {
+          return child.hitTest(result, position: transformed);
+        },
+      )) {
+        return true;
+      }
+    }
+    return false;
+  }
 
+  @override
+  bool hitTestSelf(Offset position) => size.contains(position);
+
+  void _setChild(RenderBox? child, V slot) {
     final oldChild = _slotToChild[slot];
     if (oldChild != null) {
       dropChild(oldChild);
       _slotToChild.remove(slot);
     }
-    if (child != null) {
+    if (child != null && _graphLayout.containsKey(slot)) {
       _slotToChild[slot] = child;
       adoptChild(child);
+    } else if (kDebugMode) {
+      debugPrint(
+        'Child for slot `$slot` was not added because the slot is not in the graph layout.',
+      );
+      debugPrint('Current graph layout keys: ${_graphLayout.keys.toList()}');
     }
   }
 
@@ -274,7 +311,15 @@ class GraphRenderObject<V> extends RenderBox {
 
   Offset _getChildOffset(V slot) {
     final child = _slotToChild[slot] as RenderBox;
-    final vertexPos = _graphLayout[slot]!;
+    final vertexPos = _graphLayout[slot];
+
+    if (vertexPos == null) {
+      if (kDebugMode) {
+        debugPrint('Vertex position for slot `$slot` is not specified.');
+      }
+      return Offset.zero;
+    }
+
     final childSize = child.size;
     return Offset(
       vertexPos.x + size.width / 2 - childSize.width / 2,
