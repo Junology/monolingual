@@ -1,5 +1,4 @@
 import 'dart:collection';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AboutDialog;
 import 'package:monolingual/core/dictionary.dart';
 import 'package:monolingual/ui/word_view_screen.dart';
