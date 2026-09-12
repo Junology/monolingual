@@ -30,6 +30,8 @@ class _WordInputFieldState extends State<WordInputField> {
   late ValueNotifier<String?> _dictionaryNameNotifier;
   late FocusNode _focusNode;
 
+  late Map<String, Iterable<String> Function(String)> _wordIndexMap;
+
   @override
   void initState() {
     super.initState();
@@ -38,18 +40,39 @@ class _WordInputFieldState extends State<WordInputField> {
     _dictionaryNameNotifier =
         widget.dictionaryNameNotifier ?? ValueNotifier<String?>(null);
     _focusNode = widget.focusNode ?? FocusNode();
+    _wordIndexMap = widget.wordIndexMap;
   }
 
   @override
   void didUpdateWidget(covariant WordInputField oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.textEditingController != oldWidget.textEditingController) {
+      if (oldWidget.textEditingController == null) {
+        _textEditingController.dispose();
+      }
+      _textEditingController =
+          widget.textEditingController ?? TextEditingController();
+    }
+    if (widget.dictionaryNameNotifier != oldWidget.dictionaryNameNotifier) {
+      if (oldWidget.dictionaryNameNotifier == null) {
+        _dictionaryNameNotifier.dispose();
+      }
+      _dictionaryNameNotifier =
+          widget.dictionaryNameNotifier ?? ValueNotifier<String?>(null);
+    }
     if (widget.focusNode != oldWidget.focusNode) {
       if (oldWidget.focusNode == null) {
         _focusNode.dispose();
       }
       _focusNode = widget.focusNode ?? FocusNode();
     }
-    _updateDictionaryName();
+    // TODO: Detect change of [wordIndexMap] properly
+    if (widget.wordIndexMap != oldWidget.wordIndexMap) {
+      _wordIndexMap = widget.wordIndexMap;
+      _updateDictionaryName();
+      // Force `RawAutocomplete` to rebuild options
+      _refreshAutocompleteOptions();
+    }
   }
 
   @override
@@ -66,6 +89,29 @@ class _WordInputFieldState extends State<WordInputField> {
     super.dispose();
   }
 
+  /// Force `RawAutocomplete` to rebuild options
+  /// This method is needed since the current implementation of `RawAutocomplete`
+  /// does not automatically rebuild its options when the underlying data changes.
+  ///
+  /// Related issue and PR:
+  /// - https://github.com/flutter/flutter/issues/159443
+  /// - https://github.com/flutter/flutter/pull/190686
+  ///
+  /// TODO: Remove [WordInputField._refreshAutocompleteOptions] once `RawAutocomplete` properly rebuilds its options.
+  void _refreshAutocompleteOptions() {
+    if (_textEditingController.text.isEmpty) return;
+
+    final aux = _textEditingController.value;
+    _textEditingController.value = aux.copyWith(
+      text: '${aux.text}\u200B', // add the zero-width space
+      selection: TextSelection.collapsed(offset: aux.text.length + 1),
+    );
+    //_textEditingController.value = aux;
+    _textEditingController.value = aux.copyWith(
+      selection: TextSelection.collapsed(offset: aux.text.length),
+    );
+  }
+
   void _updateDictionaryName([String? word]) {
     word ??= _textEditingController.text;
     final current = _dictionaryNameNotifier.value;
@@ -73,7 +119,7 @@ class _WordInputFieldState extends State<WordInputField> {
     // The current word is in the dictionary.
     // In this case, we don't need to update the dictionary name.
     if (current != null &&
-        widget.wordIndexMap[current]?.call(word).firstOrNull == word) {
+        _wordIndexMap[current]?.call(word).firstOrNull == word) {
       return;
     }
 
@@ -81,7 +127,7 @@ class _WordInputFieldState extends State<WordInputField> {
     // Namely, if there is a unique dictionary that contains the word, then it
     // is the one.
     // If there are none or multiple, then set the dictionary name to `null`.
-    final guess = widget.wordIndexMap.entries
+    final guess = _wordIndexMap.entries
         .where((element) => element.value(word!).firstOrNull == word)
         .singleOrNull;
     if (guess != null) {
@@ -124,9 +170,10 @@ class _WordInputFieldState extends State<WordInputField> {
           return const Iterable<MapEntry<String, String>>.empty();
         }
 
-        var words = widget.wordIndexMap.entries.expand(
+        final words = _wordIndexMap.entries.expand(
           (entry) => entry.value(text).map((word) => MapEntry(entry.key, word)),
         );
+
         return words.sorted((a, b) {
           int cmp = a.value.compareTo(b.value);
           return cmp != 0 ? cmp : a.key.compareTo(b.key);
