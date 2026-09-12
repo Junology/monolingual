@@ -95,7 +95,8 @@ class _WordViewBodyState extends State<_WordViewBody> {
       body: SingleChildScrollView(
         child: WordViewWidget(
           wordRecord: _record,
-          isKnownSynonym: (synonym) => widget.dictionary.find(synonym) != null,
+          isKnownSynonym: (synonym) =>
+              widget.dictionary.isearch(synonym).firstOrNull == synonym,
           onVariantAdd: () {
             showDialog(
               context: context,
