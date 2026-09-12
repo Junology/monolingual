@@ -39,12 +39,6 @@ class _SynonymViewState extends State<SynonymView> {
   @override
   void didUpdateWidget(covariant SynonymView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    debugPrint(
-      'didUpdateWidget: oldWord=${oldWidget.word}, newWord=${widget.word}',
-    );
-    debugPrint(
-      'dictionary updated: ${oldWidget.dictionary != widget.dictionary}',
-    );
     if (oldWidget.word != widget.word ||
         oldWidget.dictionary != widget.dictionary) {
       _buildGraph();
