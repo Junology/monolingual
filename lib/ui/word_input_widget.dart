@@ -49,6 +49,7 @@ class _WordInputFieldState extends State<WordInputField> {
       }
       _focusNode = widget.focusNode ?? FocusNode();
     }
+    _updateDictionaryName();
   }
 
   @override
@@ -63,6 +64,31 @@ class _WordInputFieldState extends State<WordInputField> {
       _focusNode.dispose();
     }
     super.dispose();
+  }
+
+  void _updateDictionaryName([String? word]) {
+    word ??= _textEditingController.text;
+    final current = _dictionaryNameNotifier.value;
+
+    // The current word is in the dictionary.
+    // In this case, we don't need to update the dictionary name.
+    if (current != null &&
+        widget.wordIndexMap[current]?.call(word).firstOrNull == word) {
+      return;
+    }
+
+    // Otherwise, guess a dictionary of the current word.
+    // Namely, if there is a unique dictionary that contains the word, then it
+    // is the one.
+    // If there are none or multiple, then set the dictionary name to `null`.
+    final guess = widget.wordIndexMap.entries
+        .where((element) => element.value(word!).firstOrNull == word)
+        .singleOrNull;
+    if (guess != null) {
+      setState(() => _dictionaryNameNotifier.value = guess.key);
+    } else {
+      setState(() => _dictionaryNameNotifier.value = null);
+    }
   }
 
   Widget? _buildDictionaryNameSuffix(
@@ -116,34 +142,20 @@ class _WordInputFieldState extends State<WordInputField> {
             FocusNode focusNode,
             VoidCallback onSubmitted,
           ) {
-            return ValueListenableBuilder<String?>(
-              valueListenable: _dictionaryNameNotifier,
-              builder: (context, dictionaryName, child) => TextField(
-                controller: textEditingController,
-                focusNode: focusNode,
-                autofocus: widget.autofocus,
-                onChanged: (value) {
-                  setState(() => _dictionaryNameNotifier.value = null);
-                },
-                onSubmitted: (value) {
-                  onSubmitted();
-                  if (dictionaryName == null) {
-                    final entry = widget.wordIndexMap.entries.singleWhereOrNull(
-                      (entry) => entry.value(value).contains(value),
-                    );
-                    if (entry != null) {
-                      dictionaryName = entry.key;
-                      setState(() => _dictionaryNameNotifier.value = entry.key);
-                    }
-                  } else if (dictionaryName != _dictionaryNameNotifier.value) {
-                    setState(() {});
-                  } else {
-                    widget.onSubmitted?.call(value, dictionaryName);
-                  }
-                },
-                decoration: InputDecoration(
-                  suffix: _buildDictionaryNameSuffix(context, dictionaryName),
-                ),
+            final dictionaryName = _dictionaryNameNotifier.value;
+            return TextField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              autofocus: widget.autofocus,
+              onChanged: (value) => _updateDictionaryName(value),
+              onSubmitted: (value) {
+                onSubmitted();
+                if (dictionaryName != null) {
+                  widget.onSubmitted?.call(value, dictionaryName);
+                }
+              },
+              decoration: InputDecoration(
+                suffix: _buildDictionaryNameSuffix(context, dictionaryName),
               ),
             );
           },
