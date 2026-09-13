@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   visibleDepth: 2,
                   onWordTapped: (word) =>
                       _gotoWord(context, word, value.dictionary),
-                  scale: 100,
+                  scale: 50,
                 );
               },
             ),

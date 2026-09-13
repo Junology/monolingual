@@ -1,7 +1,8 @@
 import 'dart:collection';
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Stack;
 import 'package:monolingual/core/dictionary.dart';
+import 'package:monolingual/core/sumtree.dart';
 import 'package:monolingual/core/graph.dart';
 import 'package:monolingual/ui/graphview_widget.dart';
 
@@ -49,17 +50,32 @@ class _SynonymViewState extends State<SynonymView> {
     setState(() => _graphData = null);
 
     final dictionary = widget.dictionary;
+
+    // Create a graph of synonyms starting from the given word as the root.
+    // The graph is constructed using a breadth-first traversal up to the
+    // specified search depth.
+    // Besides constructing the graph, the spanning-tree which tracks the
+    // breadth-first traversal is also constructed using [SumTreeNode] to
+    // count the number of nodes in each subtree.
+
+    // Target data
     final HashMap<String, int> depthMap = HashMap<String, int>();
-    final Queue<({String word, int depth})> queue =
-        Queue<({String word, int depth})>.from([(word: widget.word, depth: 0)]);
+    final SumTreeNode<String> root = SumTreeNode<String>(widget.word, 1);
     final Graph<String> graph = Graph<String>(vertices: [widget.word]);
 
+    // Queue for breadth-first traversal
+    final Queue<({String word, int depth, SumTreeNode<String> node})> queue =
+        Queue<({String word, int depth, SumTreeNode<String> node})>.from([
+          (word: widget.word, depth: 0, node: root),
+        ]);
+
+    // Breadth-first traversal
     while (queue.isNotEmpty) {
-      final current = queue.removeFirst();
-      final word = current.word;
-      final depth = current.depth;
+      final (:word, :depth, :node) = queue.removeFirst();
 
       depthMap[word] = depth;
+
+      if (depth >= widget.searchDepth) continue;
 
       final record = await dictionary.find(word);
 
@@ -69,44 +85,81 @@ class _SynonymViewState extends State<SynonymView> {
         graph.addVertex(synonym);
         graph.addEdge(word, synonym, 2);
 
-        if (depth < widget.searchDepth && !depthMap.containsKey(synonym)) {
-          queue.add((word: synonym, depth: depth + 1));
+        if (!depthMap.containsKey(synonym)) {
+          depthMap[synonym] = depth + 1;
+          queue.add((
+            word: synonym,
+            depth: depth + 1,
+            node: node.createChild(synonym, 1),
+          ));
         }
       }
     }
 
-    // TODO: Change the algorithm to determine the initial positions of vertices:
-    // 1. compute a spanning tree of the graph from the given word as the root
-    //    with subtree node counting by the breadth-first traversal;
-    // 2. divide the angle for branches proportionally based on the node count.
-    // 3. assign initial positions to the vertices based on the computed angles
-    //    and depths.
+    // Generate initial positions [GraphVertex] for the vertices based on their
+    // depth and the size of the subtree in the spanning tree [root] created
+    // in the previous breadth-first traversal (see above).
+
+    // target data
     final initialPos = HashMap<String, GraphVertex>();
-    final phases = List<double>.generate(
-      widget.visibleDepth + 1,
-      (index) => index % pi,
-    );
-    final denoms = List<int>.filled(widget.visibleDepth + 1, 0);
-    for (final d in depthMap.values) {
-      if (d <= widget.visibleDepth) {
-        denoms[d]++;
+
+    // Stack for depth-first traversal in the spanning tree
+    List<({SumTreeNode<String> node, int depth, double start, double end})>
+    stack = [(node: root, depth: 0, start: 0, end: 2 * pi)];
+
+    // Depth-first traversal to assign initial positions to the vertices in the
+    // spanning tree of depth up to `widget.visibleDepth`.
+    // The algorithm works as follows:
+    // 1. divide the angle for branches proportionally based on the size of the
+    //    subtree.
+    // 2. assign initial positions to the vertices based on the computed angles
+    //    and depths.
+    while (stack.isNotEmpty) {
+      final (:node, :depth, :start, :end) = stack.removeLast();
+
+      // The angle for the current vertex
+      // The last term is a perturbation in order to make sure the vertices
+      // are in "general position".
+      // Thus, it should not be a rational multiple of pi.
+      final angle = (start + end) / 2 + (0.125 * depth / widget.visibleDepth);
+
+      // The radius of the current vertex based on its depth.
+      // Since we scale the whole vertices later, we don't have [widget.scale]
+      // here.
+      final r = depth.toDouble();
+
+      // Assign the computed position to the current vertex.
+      initialPos[node.value] = GraphVertex(r * cos(angle), r * sin(angle));
+
+      // Descend to the children if the current depth is less than the specified
+      // depth.
+      if (depth >= widget.visibleDepth) continue;
+      final delta = (end - start) / (node.sum - 1);
+      double childAngle = start;
+      for (final child in node.children) {
+        final childEnd = childAngle + delta * child.sum;
+        stack.add((
+          node: child,
+          depth: depth + 1,
+          start: childAngle,
+          end: childEnd,
+        ));
+        childAngle = childEnd;
       }
     }
-    for (final entry in depthMap.entries) {
-      final word = entry.key;
-      final depth = entry.value;
-      if (depth > widget.visibleDepth) continue;
 
-      final r = widget.scale * depth;
-      final a = phases[depth];
-      initialPos[word] = GraphVertex(r * cos(a), r * sin(a));
-      phases[depth] += 2 * pi / denoms[depth];
-    }
+    // Compute the layout of the graph using the Kamada-Kawai algorithm.
+    final graphLayout = graph
+        .disoriented((x, y) => (x + y) ~/ 4)
+        .kamadaKawaiLayout(initialPos, kk: 10.0);
 
-    // TODO: call `graph.kamadaKawaiLayout()` to compute the "good" layout.
+    // TODO: apply in addition the Fruchterman-Reingold algorithm to improve the layout, in particular, to avoid overlapping vertices.
+
+    final basePos = graphLayout[widget.word]!;
+    graphLayout.updateAll((_, v) => (v - basePos).scaled(widget.scale));
 
     setState(() {
-      _graphData = (graph: graph, positions: initialPos);
+      _graphData = (graph: graph, positions: graphLayout);
     });
   }
 
