@@ -29,8 +29,8 @@ void main() {
   });
 
   group('kamadaKawaiLayout', () {
-    const kk = 1.0;
-    const eps = (1.0 / (1 << 8));
+    const kk = 10.0;
+    const eps = (1.0 / (1 << 9));
 
     test('empty graph returns empty result', () {
       final graph = Graph<String>();

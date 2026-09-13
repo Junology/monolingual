@@ -492,31 +492,30 @@ class Graph<V> {
         }
 
         // Update the position
+        final oldPosition = positions[iMax];
         positions[iMax] += update;
 
         // Update the maximum force and gradient for the next iteration
-        maxGrad = GraphVertex.zero();
+        var newGrad = GraphVertex.zero();
         for (int i = 0; i < vertices.length; ++i) {
           if (i == iMax) continue;
 
           final diff = positions[iMax] - positions[i];
           final unitDiff = diff.normalized();
-          maxGrad.add(
+          newGrad.add(
             (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
           );
         }
-        var newDelta = maxGrad.length;
-
-        // Terminate the inner loop if the gradient reaches below the tolerance.
-        if (newDelta < threshold) break;
+        var newDelta = newGrad.length;
 
         // If the new gradient is larger than the previous maximum, fall back to
-        // linear estimate of the update vector.
-        if (newDelta >= maxDelta) {
-          positions[iMax] -= update.scaled(newDelta / (newDelta + maxDelta));
+        // binary search between the original position and the updated one.
+        while (newDelta >= maxDelta && update.length2 > tolerance * tolerance) {
+          update.scale(0.5);
+          positions[iMax] = oldPosition + update;
 
-          // Compute the maximum force and gradient for the fallback linear estimate.
-          final newGrad = GraphVertex.zero();
+          // Reompute the maximum force and gradient
+          newGrad.setZero();
           for (int i = 0; i < vertices.length; ++i) {
             if (i == iMax) continue;
 
@@ -527,27 +526,32 @@ class Graph<V> {
             );
           }
           newDelta = newGrad.length;
-
-          // If the new gradient is still larger than the previous gradient,
-          //  - and if the new gradient is smaller than the second maximum,
-          //    terminate the inner loop.
-          //  - otherwise, give up: set [itrCount] to [maxIterations] and break,
-          //    which will terminate the outer loop as well.
-          if (newDelta >= maxDelta) {
-            if (newDelta > secondMaxDelta) {
-              itrCount = maxIterations;
-            }
-            break;
-          }
-          maxGrad = newGrad;
         }
 
+        // If the new gradient is still larger than the previous gradient,
+        // rollback to the old position and terminate the inner loop.
+        //  - Furthermore, if the new gradient is not even smaller than the
+        //    second maximum, then give up and terminate the outer loop as well.
+        if (newDelta >= maxDelta) {
+          positions[iMax] = oldPosition;
+          if (newDelta >= secondMaxDelta) {
+            itrCount = maxIterations;
+          }
+          break;
+        }
+
+        maxGrad = newGrad;
         maxDelta = newDelta;
+
+        // Terminate the inner loop if the gradient reaches below the tolerance.
+        if (maxDelta < threshold) break;
       }
 
       if (itrCount + 1 >= maxIterations) {
         if (kDebugMode) {
-          print('The loop has reached the maximum number of iterations.');
+          print(
+            'The loop has reached the maximum number of iterations ($maxIterations).',
+          );
         }
       }
     }
