@@ -15,6 +15,8 @@ class SumTreeNode<T> {
   int get sum => _sum;
   SumTreeNode<T>? get parent => _parent;
 
+  SumTreeNode._internal(this.value, this._sum, this._parent, this.children);
+
   /// Create a new SumTree node with the given [value] and [term].
   /// The [sum] of this node will be automatically computed as the sum of
   /// the given [term] and [sum]s of the children.
@@ -28,6 +30,15 @@ class SumTreeNode<T> {
     for (final child in this.children) {
       _sum += child._sum;
       child._parent = this;
+    }
+  }
+
+  /// Add [diff] to the [sum] of this node and all its ancestors.
+  void _addTerm(int diff) {
+    SumTreeNode<T>? node = this;
+    while (node != null) {
+      node._sum += diff;
+      node = node._parent;
     }
   }
 
@@ -45,11 +56,21 @@ class SumTreeNode<T> {
 
     children.add(child);
     child._parent = this;
-    SumTreeNode<T>? ancestor = this;
-    while (ancestor != null) {
-      ancestor._sum += child._sum;
-      ancestor = ancestor._parent;
-    }
+    _addTerm(child._sum);
+  }
+
+  /// Create a new child node with the given [value] and [term].
+  /// This will update [sum] of this node and all its ancestors.
+  /// Return the newly created child node.
+  ///
+  /// ## Time Complexity
+  /// Average $O(\log n)$ time complexity, though it can be $O(n)$ in the worst
+  /// case where the tree is highly unbalanced.
+  SumTreeNode<T> createChild(T value, int term) {
+    final child = SumTreeNode<T>._internal(value, term, this, []);
+    children.add(child);
+    _addTerm(term);
+    return child;
   }
 
   /// Remove a direct child [child] from this node.
@@ -63,11 +84,7 @@ class SumTreeNode<T> {
     if (!children.remove(child)) return;
 
     child._parent = null;
-    SumTreeNode<T>? ancestor = this;
-    while (ancestor != null) {
-      ancestor._sum -= child._sum;
-      ancestor = ancestor._parent;
-    }
+    _addTerm(-child._sum);
   }
 
   /// Remove this node from its parent, if any.
