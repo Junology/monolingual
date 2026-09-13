@@ -326,7 +326,9 @@ class Graph<V> {
   /// @param maxIterations The maximum number of iterations for the algorithm.
   /// If not specified, it will default to [initialPositions.length * 1000].
   /// @param tolerance The convergence tolerance for the algorithm. If not
-  /// specified, it will default to 2^-22 (cf. ULP for 32bit floating-point numbers is 2^-23).
+  /// specified, it will default to 2^-22 (cf. ULP for 32bit floating-point
+  /// numbers is 2^-23). Note that the tolerance is not always guaranteed when
+  /// the algorithm may not converge to a solution in the required precision.
   /// @returns A [HashMap] mapping each vertex to its 2D position as a [GraphVertex].
   /// @warning If the graph is not strongly connected, the computation diverges
   /// and may not produce a valid layout.
@@ -423,6 +425,7 @@ class Graph<V> {
       int iMax = 0;
       GraphVertex maxGrad = GraphVertex.zero();
       double maxDelta = 0.0;
+      double secondMaxDelta = 0.0;
 
       for (int i = 0; i < vertices.length; ++i) {
         final grad = GraphVertex.zero();
@@ -438,16 +441,17 @@ class Graph<V> {
         final delta = grad.length;
 
         if (delta > maxDelta) {
-          maxDelta = delta;
           iMax = i;
           maxGrad = grad;
+          secondMaxDelta = maxDelta;
+          maxDelta = delta;
+        } else if (delta > secondMaxDelta) {
+          secondMaxDelta = delta;
         }
       }
 
       // Terminate the iteration when the positions reached around equilibrium.
-      if (maxDelta < threshold) {
-        break;
-      }
+      if (maxDelta < threshold) break;
 
       // Apply Newton-Raphson method to the chosen vertex
       while (true) {
@@ -501,7 +505,7 @@ class Graph<V> {
             (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
           );
         }
-        final newDelta = maxGrad.length;
+        var newDelta = maxGrad.length;
 
         // Terminate the inner loop if the gradient reaches below the tolerance.
         if (newDelta < threshold) break;
@@ -511,21 +515,34 @@ class Graph<V> {
         if (newDelta >= maxDelta) {
           positions[iMax] -= update.scaled(newDelta / (newDelta + maxDelta));
 
-          // Update the maximum force and gradient for the next iteration
-          maxGrad = GraphVertex.zero();
+          // Compute the maximum force and gradient for the fallback linear estimate.
+          final newGrad = GraphVertex.zero();
           for (int i = 0; i < vertices.length; ++i) {
             if (i == iMax) continue;
 
             final diff = positions[iMax] - positions[i];
             final unitDiff = diff.normalized();
-            maxGrad.add(
+            newGrad.add(
               (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
             );
           }
-          maxDelta = maxGrad.length;
-        } else {
-          maxDelta = newDelta;
+          newDelta = newGrad.length;
+
+          // If the new gradient is still larger than the previous gradient,
+          //  - and if the new gradient is smaller than the second maximum,
+          //    terminate the inner loop.
+          //  - otherwise, give up: set [itrCount] to [maxIterations] and break,
+          //    which will terminate the outer loop as well.
+          if (newDelta >= maxDelta) {
+            if (newDelta > secondMaxDelta) {
+              itrCount = maxIterations;
+            }
+            break;
+          }
+          maxGrad = newGrad;
         }
+
+        maxDelta = newDelta;
       }
 
       if (itrCount + 1 >= maxIterations) {
