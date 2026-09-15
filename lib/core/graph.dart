@@ -317,6 +317,44 @@ class Graph<V> {
     return result;
   }
 
+  /// Compute the energy function along with its gradient vector for the
+  /// Kamada-Kawai layout algorithm at the [i]-th vertex in [positions].
+  /// The gradient vector will be added to [gradientOut].
+  ///
+  /// @returns The energy value at the [i]-th vertex.
+  ///
+  /// ### Note
+  /// The value of the energy is actually twice of the its by-definition
+  /// value. One needs to divide it by 2 to obtain the conventional energy value.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
+  double _kamadaKawaiEnergy(
+    final List<GraphVertex> positions,
+    final int i,
+    final List<double> springLength,
+    final List<double> springCoeff,
+    final GraphVertex gradientOut,
+  ) {
+    gradientOut.setZero();
+    double e = 0.0;
+    for (int j = 0; j < vertices.length; ++j) {
+      if (i == j) continue;
+
+      final diff = positions[i] - positions[j];
+      final norm = diff.length;
+      final delta = norm - springLength[j];
+
+      e += springCoeff[j] * delta * delta;
+
+      if (norm == 0.0) continue;
+
+      diff.scale(springCoeff[j] * (1.0 - springLength[j] / norm));
+      gradientOut.add(diff);
+    }
+
+    return e;
+  }
+
   /// Compute a planar layout for the graph using a Kamada-Kawai algorithm.
   /// Only the positions of vertices present in [initialPositions] will be
   /// computed though the other vertices affects the overall layout.
@@ -336,7 +374,7 @@ class Graph<V> {
     HashMap<V, GraphVertex> initialPositions, {
     required double kk,
     int? maxIterations,
-    double tolerance = 1.0 / (1 << 22),
+    double tolerance = 1.0 / (1 << 26),
   }) {
     maxIterations ??= initialPositions.length * 100;
 
@@ -394,49 +432,54 @@ class Graph<V> {
       growable: false,
     );
 
-    // The following iteration goes on until the system reaches "equilibrium".
+    // The following iteration tries to minimize the energy function of the
+    // system of "springs" as described in the Kamada-Kawai layout algorithm.
     // Here, a *pointwise* Newton-Raphson method is applied to find the layout
-    // on which the gradient of the energy function (aka. the *force*) vanishes.
-    // Hence, the "equilibrium" means that the updating of vertex positions
-    // doesn't improve the size of the gradient.
+    // on which the energy at the vertex experiencing the maximum force is
+    // minimized.
     //
     // More precisely, each iteration step consists of the following:
     //
-    // 1. Compute the force vectors applied to each vertex and find the vertex
-    //    experiencing the maximum force.
+    // 1. Compute the energy and the force vectors applied to each vertex and
+    //    find the vertex experiencing the maximum force.
     //    - Set `iMax` to the index of this vertex and `grad` the force vector.
     //    - If the size of `grad` (the force) doesn't exceed the maximum in the
     //      previous iteration (`maxDelta`), the system has reached equilibrium.
     //    - In this case, the iteration is terminated.
     // 2. Update the chosen vertex using the Newton-Raphson method until it
-    //    reaches equilibrium.
-    //    - Compute the update vector $u$ by solving $Ju = -\text{grad}$, where
-    //      $J$ is the Jacobian matrix of the (pointwise) gradient of the energy
-    //      function (seen as $\text{grad}:\mathbb R^2\to\mathbb R^2$).
-    //    - Update `positions[iMax]` by adding the update vector $u$.
-    //    - Re-calculate the (pointwise) gradient vector at the chosen vertex.
-    //    - If the size of the gradient vector is not improved (i.e. not smaller)
-    //      than the one in the previous inner iteration, this pointwise
-    //      Newton-Raphson iteration has reached equilibrium, so the inner loop
-    //      is terminated.
+    //    sufficiently minimizes the energy at that vertex.
+    //    - Compute the update vector $u$ as follows: it is obtained by scaling
+    //      the negated gradient vector by $1/\lambda$ in the direction of
+    //      each positive eigenvalue of the Hessian matrix.
+    //      (Note that this operation is exactly equivalent to solving the
+    //      linear system $H u = -\mathrm{grad}$ as in the ordinary Newton-Raphson
+    //      method.)
+    //    - Update `positions[iMax]` by adding the update vector $\alpha u$,
+    //      where $\alpha$ is a step size parameter.
+    //    - Re-compute the energy and the gradient at the chosen vertex.
+    //    - Re-choose the step size parameter $\alpha$ until the Armijo
+    //      condition is satisfied.
+    //    - If the energy is not improved, this pointwise Newton-Raphson
+    //      iteration has reached equilibrium, so the inner loop is terminated.
     //    - Otherwise, repeat the above inner loop.
     for (int itrCount = 0; itrCount < maxIterations; ++itrCount) {
       // Compute force vectors, and determine the vertex with the maximum force
       int iMax = 0;
       GraphVertex maxGrad = GraphVertex.zero();
       double maxDelta = 0.0;
+      // The energy term for the vertex experiencing the maximum force.
+      double maxEnergy = 0.0;
       double secondMaxDelta = 0.0;
 
       for (int i = 0; i < vertices.length; ++i) {
         final grad = GraphVertex.zero();
-        for (int j = 0; j < vertices.length; ++j) {
-          if (i == j) continue;
-
-          final diff = positions[i] - positions[j];
-          final unitDiff = diff.normalized();
-
-          grad.add((diff - unitDiff * springLength[i][j]) * springCoeff[i][j]);
-        }
+        final double e = _kamadaKawaiEnergy(
+          positions,
+          i,
+          springLength[i],
+          springCoeff[i],
+          grad,
+        );
 
         final delta = grad.length;
 
@@ -445,6 +488,7 @@ class Graph<V> {
           maxGrad = grad;
           secondMaxDelta = maxDelta;
           maxDelta = delta;
+          maxEnergy = e;
         } else if (delta > secondMaxDelta) {
           secondMaxDelta = delta;
         }
@@ -480,59 +524,68 @@ class Graph<V> {
         }
 
         final double det = xx * yy - xy * xy;
+        final double trace = xx + yy;
         late final GraphVertex update;
-        if (det.abs() < tolerance * tolerance) {
-          update = -maxGrad.scaled(1.0 / (xx + yy));
-        } else {
-          // Solve the linear system $Ju=-grad$ to compute the update vector.
+        if (det > tolerance * tolerance && trace > tolerance) {
+          // If the Hessian is positive definite, compute the update vector $u$ by
+          // solving the linear system $Hu=-grad$.
           update = GraphVertex(
             (-yy * maxGrad.x + xy * maxGrad.y) / det,
             (xy * maxGrad.x - xx * maxGrad.y) / det,
           );
+        } else if (det < -tolerance * tolerance || trace > tolerance) {
+          // If only one of the eigen value of the Hessian is positive, we scale
+          // the update vector along the direction of the positive eigenvalue.
+          final discriminant = trace * trace - 4 * det;
+          final eigenVal = (trace + sqrt(discriminant)) / 2;
+          final eigenVec = GraphVertex(xy, eigenVal - xx).normalized();
+          update =
+              -maxGrad +
+              eigenVec * (1.0 - 1.0 / eigenVal) * maxGrad.dot(eigenVec);
+        } else {
+          // Otherwise, just use the gradient vector.
+          update = -maxGrad;
         }
 
-        // Update the position
-        final oldPosition = positions[iMax];
-        positions[iMax] += update;
+        // Update the position by backtracking line search
+        final oldPosition = positions[iMax].clone();
+        double bound = (1.0 / (1 << 10)) * maxGrad.dot(update);
+        final GraphVertex newGrad = GraphVertex.zero();
+        late double newEnergy;
 
-        // Update the maximum force and gradient for the next iteration
-        var newGrad = GraphVertex.zero();
-        for (int i = 0; i < vertices.length; ++i) {
-          if (i == iMax) continue;
+        for (int cnt = 0; cnt < 8; ++cnt) {
+          // Update the position by the current update vector
+          positions[iMax].setFrom(oldPosition + update);
 
-          final diff = positions[iMax] - positions[i];
-          final unitDiff = diff.normalized();
-          newGrad.add(
-            (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
-          );
-        }
-        var newDelta = newGrad.length;
-
-        // If the new gradient is larger than the previous maximum, fall back to
-        // binary search between the original position and the updated one.
-        while (newDelta >= maxDelta && update.length2 > tolerance * tolerance) {
-          update.scale(0.5);
-          positions[iMax] = oldPosition + update;
-
-          // Reompute the maximum force and gradient
+          // Re-compute the energy and the gradient
           newGrad.setZero();
-          for (int i = 0; i < vertices.length; ++i) {
-            if (i == iMax) continue;
+          newEnergy = _kamadaKawaiEnergy(
+            positions,
+            iMax,
+            springLength[iMax],
+            springCoeff[iMax],
+            newGrad,
+          );
 
-            final diff = positions[iMax] - positions[i];
-            final unitDiff = diff.normalized();
-            newGrad.add(
-              (diff - unitDiff * springLength[iMax][i]) * springCoeff[iMax][i],
-            );
-          }
-          newDelta = newGrad.length;
+          // If the update satisfies the Armijo condition, accept it.
+          if (newEnergy < maxEnergy + bound) break;
+
+          update.scale(0.5);
+          bound /= 2;
         }
 
-        // If the new gradient is still larger than the previous gradient,
-        // rollback to the old position and terminate the inner loop.
+        final newDelta = newGrad.length;
+
+        // If the update didn't improve the energy, rollback to the old position
+        // and terminate the inner loop.
         //  - Furthermore, if the new gradient is not even smaller than the
         //    second maximum, then give up and terminate the outer loop as well.
-        if (newDelta >= maxDelta) {
+        if (newEnergy >= maxEnergy) {
+          if (kDebugMode) {
+            print(
+              'New energy ($newEnergy) did not improve over max energy ($maxEnergy).',
+            );
+          }
           positions[iMax] = oldPosition;
           if (newDelta >= secondMaxDelta) {
             itrCount = maxIterations;
@@ -542,6 +595,7 @@ class Graph<V> {
 
         maxGrad = newGrad;
         maxDelta = newDelta;
+        maxEnergy = newEnergy;
 
         // Terminate the inner loop if the gradient reaches below the tolerance.
         if (maxDelta < threshold) break;
