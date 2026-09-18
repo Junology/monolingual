@@ -40,7 +40,9 @@ class _WordInputFieldState extends State<WordInputField> {
     _dictionaryNameNotifier =
         widget.dictionaryNameNotifier ?? ValueNotifier<String?>(null);
     _focusNode = widget.focusNode ?? FocusNode();
-    _wordIndexMap = widget.wordIndexMap;
+    _wordIndexMap = Map<String, Iterable<String> Function(String)>.from(
+      widget.wordIndexMap,
+    );
   }
 
   @override
@@ -67,8 +69,11 @@ class _WordInputFieldState extends State<WordInputField> {
       _focusNode = widget.focusNode ?? FocusNode();
     }
     // TODO: Detect change of [wordIndexMap] properly
-    if (widget.wordIndexMap != oldWidget.wordIndexMap) {
-      _wordIndexMap = widget.wordIndexMap;
+    const mapEquality = MapEquality();
+    if (!mapEquality.equals(widget.wordIndexMap, oldWidget.wordIndexMap)) {
+      _wordIndexMap = Map<String, Iterable<String> Function(String)>.from(
+        widget.wordIndexMap,
+      );
       _updateDictionaryName();
       // Force `RawAutocomplete` to rebuild options
       _refreshAutocompleteOptions();
@@ -204,6 +209,7 @@ class _WordInputFieldState extends State<WordInputField> {
               decoration: InputDecoration(
                 suffix: _buildDictionaryNameSuffix(context, dictionaryName),
               ),
+              enabled: _wordIndexMap.isNotEmpty,
             );
           },
       optionsViewBuilder: (context, onSelected, options) {
