@@ -4,11 +4,12 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart'; // for debug
 import 'package:vector_math/vector_math_64.dart';
 
+typedef GraphWeight = int;
 typedef GraphVertex = Vector2;
 
 /// A basic binary min-heap implementation.
 class _MinHeap {
-  final List<({int key, int value})> _heap;
+  final List<({GraphWeight key, int value})> _heap;
 
   _MinHeap._(this._heap);
 
@@ -17,7 +18,7 @@ class _MinHeap {
 
   /// Creates a min-heap from an existing list of elements.
   // ignore: unused_element
-  factory _MinHeap.heapify(List<({int key, int value})> elements) {
+  factory _MinHeap.heapify(List<({GraphWeight key, int value})> elements) {
     final heap = _MinHeap._(List.from(elements));
     for (int i = (heap._heap.length >> 1) - 1; i >= 0; i--) {
       heap._heapDown(i);
@@ -63,13 +64,13 @@ class _MinHeap {
   bool get isEmpty => _heap.isEmpty;
 
   /// Insert a new element into the heap.
-  void insert(int key, int value) {
+  void insert(GraphWeight key, int value) {
     _heap.add((key: key, value: value));
     _heapUp(_heap.length - 1);
   }
 
   /// Remove and return the element with the smallest key from the heap.
-  ({int key, int value}) extractMin() {
+  ({GraphWeight key, int value}) extractMin() {
     if (_heap.isEmpty) {
       throw StateError('Heap is empty');
     }
@@ -87,9 +88,9 @@ class _MinHeap {
 /// @note Won't support deletion of vertices or edges.
 class Graph<V> {
   /// The maximum distance value used to represent "infinity" in shortest path calculations.
-  static const int maxDistance = 1 << 52;
+  static const GraphWeight maxDistance = 0x10000000000000; // = 1 << 52
 
-  final List<({V key, Map<int, int> adjacency})> _nodes;
+  final List<({V key, Map<int, GraphWeight> adjacency})> _nodes;
   final HashMap<V, int> _vertexIndexMap;
 
   /// The constructor for internal use
@@ -106,9 +107,10 @@ class Graph<V> {
 
   /// Deep copy constructor.
   Graph.from(Graph<V> other)
-    : _nodes = List<({V key, Map<int, int> adjacency})>.from(
+    : _nodes = List<({V key, Map<int, GraphWeight> adjacency})>.from(
         other._nodes.map(
-          (e) => (key: e.key, adjacency: Map<int, int>.from(e.adjacency)),
+          (e) =>
+              (key: e.key, adjacency: Map<int, GraphWeight>.from(e.adjacency)),
         ),
       ),
       _vertexIndexMap = HashMap.from(other._vertexIndexMap);
@@ -119,7 +121,7 @@ class Graph<V> {
 
   /// Returns an iterable of all edges in the graph as a tuple of source, target,
   /// and weight, i.e., `({V source, V target, int weight})`.
-  Iterable<({V source, V target, int weight})> get edges sync* {
+  Iterable<({V source, V target, GraphWeight weight})> get edges sync* {
     for (final node in _nodes) {
       final source = node.key;
       for (final edge in node.adjacency.entries) {
@@ -136,7 +138,8 @@ class Graph<V> {
   @override
   int get hashCode => Object.hash(
     UnorderedIterableEquality<V>().hash(_vertexIndexMap.keys),
-    UnorderedIterableEquality<({V source, V target, int weight})>().hash(edges),
+    UnorderedIterableEquality<({V source, V target, GraphWeight weight})>()
+        .hash(edges),
   );
 
   @override
@@ -147,10 +150,8 @@ class Graph<V> {
           _vertexIndexMap.keys,
           other._vertexIndexMap.keys,
         ) &&
-        UnorderedIterableEquality<({V source, V target, int weight})>().equals(
-          edges,
-          other.edges,
-        );
+        UnorderedIterableEquality<({V source, V target, GraphWeight weight})>()
+            .equals(edges, other.edges);
   }
 
   /// Check if the graph contains the given [vertex].
@@ -158,7 +159,7 @@ class Graph<V> {
 
   /// Get the weight of the edge from [source] to [target].
   /// Returns `null` if either vertex does not exist or there is no edge between them.
-  int? getWeight(V source, V target) {
+  GraphWeight? getWeight(V source, V target) {
     final sourceIndex = _vertexIndexMap[source];
     final targetIndex = _vertexIndexMap[target];
     if (sourceIndex == null || targetIndex == null) return null;
@@ -186,7 +187,7 @@ class Graph<V> {
   /// @return `true` if the edge was added, `false` if either the source or
   /// target vertex does not exist or the weight is negative.
   /// @warning The method adds an edge even if it already exists, potentially creating duplicate edges.
-  bool addEdge(V source, V target, int weight) {
+  bool addEdge(V source, V target, GraphWeight weight) {
     if (weight < 0) return false;
     final sourceIndex = _vertexIndexMap[source];
     final targetIndex = _vertexIndexMap[target];
@@ -201,7 +202,7 @@ class Graph<V> {
   /// [addEdge(target, source, weight)].
   ///
   /// @warning The method adds edges even if they already exist, potentially creating duplicate edges.
-  bool addBidirectionalEdge(V source, V target, int weight) {
+  bool addBidirectionalEdge(V source, V target, GraphWeight weight) {
     if (weight < 0) return false;
     final sourceIndex = _vertexIndexMap[source];
     final targetIndex = _vertexIndexMap[target];
@@ -216,7 +217,10 @@ class Graph<V> {
   /// The method replaces any existing adjacency list for the vertex.
   ///
   /// @throws ArgumentError if [vertex] or any target vertex in [edges] does not exist.
-  void setAdjacency(V vertex, Iterable<({V target, int weight})> edges) {
+  void setAdjacency(
+    V vertex,
+    Iterable<({V target, GraphWeight weight})> edges,
+  ) {
     final vertexIndex = _vertexIndexMap[vertex];
     if (vertexIndex == null) throw ArgumentError('Unknown vertex.');
 
@@ -245,9 +249,9 @@ class Graph<V> {
   /// @warning Be aware that the order of weights passed to `mergeOp` is
   /// unspecified. Hence, it is always preferred that `mergeOp` is a commutative
   /// operation.
-  Graph<V> disoriented(int Function(int, int) mergeOp) {
+  Graph<V> disoriented(GraphWeight Function(GraphWeight, GraphWeight) mergeOp) {
     final newNodes = _nodes
-        .map((node) => (key: node.key, adjacency: <int, int>{}))
+        .map((node) => (key: node.key, adjacency: <int, GraphWeight>{}))
         .toList();
 
     for (int i = 0; i < _nodes.length; ++i) {
@@ -270,9 +274,9 @@ class Graph<V> {
     return Graph<V>._internal(newNodes, HashMap<V, int>.from(_vertexIndexMap));
   }
 
-  List<int> _dijkstraShortestPathImpl(int sourceIndex) {
+  List<GraphWeight> _dijkstraShortestPathImpl(int sourceIndex) {
     final n = _nodes.length;
-    final d = List<int>.filled(n, maxDistance);
+    final d = List<GraphWeight>.filled(n, maxDistance);
     final visited = List<bool>.filled(n, false);
     final heap = _MinHeap.empty();
 
@@ -305,54 +309,16 @@ class Graph<V> {
   ///
   /// @returns A [HashMap] mapping each vertex to its shortest path distance from [source].
   /// @note If a vertex is unreachable from [source], its distance will be set to [maxDistance].
-  HashMap<V, int> dijkstraShortestPath(V source) {
+  HashMap<V, GraphWeight> dijkstraShortestPath(V source) {
     final sourceIndex = _vertexIndexMap[source];
-    if (sourceIndex == null) return HashMap<V, int>();
+    if (sourceIndex == null) return HashMap<V, GraphWeight>();
 
     final d = _dijkstraShortestPathImpl(sourceIndex);
 
-    final result = HashMap<V, int>.fromEntries(
+    final result = HashMap<V, GraphWeight>.fromEntries(
       _vertexIndexMap.entries.map((e) => MapEntry(e.key, d[e.value])),
     );
     return result;
-  }
-
-  /// Compute the energy function along with its gradient vector for the
-  /// Kamada-Kawai layout algorithm at the [i]-th vertex in [positions].
-  /// The gradient vector will be added to [gradientOut].
-  ///
-  /// @returns The energy value at the [i]-th vertex.
-  ///
-  /// ### Note
-  /// The value of the energy is actually twice of the its by-definition
-  /// value. One needs to divide it by 2 to obtain the conventional energy value.
-  @pragma('vm:prefer-inline')
-  @pragma('dart2js:tryInline')
-  double _kamadaKawaiEnergy(
-    final List<GraphVertex> positions,
-    final int i,
-    final List<double> springLength,
-    final List<double> springCoeff,
-    final GraphVertex gradientOut,
-  ) {
-    gradientOut.setZero();
-    double e = 0.0;
-    for (int j = 0; j < vertices.length; ++j) {
-      if (i == j) continue;
-
-      final diff = positions[i] - positions[j];
-      final norm = diff.length;
-      final delta = norm - springLength[j];
-
-      e += springCoeff[j] * delta * delta;
-
-      if (norm == 0.0) continue;
-
-      diff.scale(springCoeff[j] * (1.0 - springLength[j] / norm));
-      gradientOut.add(diff);
-    }
-
-    return e;
   }
 
   /// Compute a planar layout for the graph using a Kamada-Kawai algorithm.
@@ -383,7 +349,7 @@ class Graph<V> {
         .map((v) => _vertexIndexMap[v]!)
         .toList(growable: false);
 
-    // Compute all-pairs shortest path distances
+    // Compute all-pairs shortest path distances together with the graph diameter.
     double diameter = 0.0;
     final dist = List.generate(vertices.length, (i) {
       final sssp = _dijkstraShortestPathImpl(indices[i]);
@@ -404,27 +370,8 @@ class Graph<V> {
 
     // The constant $L$ in the Kamada-Kawai original article.
     final ll = sqrt(vertices.length) / diameter;
-    // The constant $l_{ij}$ in the Kamada-Kawai original article.
-    final springLength = List.generate(
-      vertices.length,
-      (i) => List.generate(
-        vertices.length,
-        (j) => ll * dist[i][j],
-        growable: false,
-      ),
-      growable: false,
-    );
-    // The constant $k_{ij}$ in the Kamada-Kawai original article.
-    final springCoeff = List.generate(
-      vertices.length,
-      (i) => List.generate(
-        vertices.length,
-        (j) => dist[i][j] == 0 ? 0.0 : kk / (dist[i][j] * dist[i][j]),
-        growable: false,
-      ),
-      growable: false,
-    );
-
+    // The system of "springs" given by [Kamada-Kawai].
+    final system = _KamadaKawaiSystem(dist, ll, kk);
     // Initialize vertex positions
     final List<GraphVertex> positions = List.generate(
       vertices.length,
@@ -473,13 +420,7 @@ class Graph<V> {
 
       for (int i = 0; i < vertices.length; ++i) {
         final grad = GraphVertex.zero();
-        final double e = _kamadaKawaiEnergy(
-          positions,
-          i,
-          springLength[i],
-          springCoeff[i],
-          grad,
-        );
+        final double e = system.energy(positions, i, grad);
 
         final delta = grad.length;
 
@@ -499,29 +440,7 @@ class Graph<V> {
 
       // Apply Newton-Raphson method to the chosen vertex
       while (true) {
-        double xx = 0.0, xy = 0.0, yy = 0.0;
-        for (int i = 0; i < vertices.length; ++i) {
-          if (i == iMax) continue;
-
-          final diff = positions[iMax] - positions[i];
-          final length1 = diff.length;
-          final length3 = length1 * diff.length2;
-
-          if (length1 < tolerance) continue;
-
-          xx +=
-              springCoeff[iMax][i] *
-              (1.0 - springLength[iMax][i] * diff.y * diff.y / length3);
-          xy +=
-              springCoeff[iMax][i] *
-              springLength[iMax][i] *
-              diff.x *
-              diff.y /
-              length3;
-          yy +=
-              springCoeff[iMax][i] *
-              (1.0 - springLength[iMax][i] * diff.x * diff.x / length3);
-        }
+        final (xx, xy, yy) = system.hessian(positions, iMax);
 
         final double det = xx * yy - xy * xy;
         final double trace = xx + yy;
@@ -559,13 +478,7 @@ class Graph<V> {
 
           // Re-compute the energy and the gradient
           newGrad.setZero();
-          newEnergy = _kamadaKawaiEnergy(
-            positions,
-            iMax,
-            springLength[iMax],
-            springCoeff[iMax],
-            newGrad,
-          );
+          newEnergy = system.energy(positions, iMax, newGrad);
 
           // If the update satisfies the Armijo condition, accept it.
           if (newEnergy < maxEnergy + bound) break;
@@ -611,5 +524,100 @@ class Graph<V> {
     }
 
     return HashMap<V, GraphVertex>.fromIterables(vertices, positions);
+  }
+}
+
+class _KamadaKawaiSystem {
+  /// The table of the natural lengths of the springs between vertices.
+  final List<List<double>> _springLengths;
+
+  /// The table of the spring coefficients of the spring between vertices.
+  final List<List<double>> _springCoeffs;
+
+  _KamadaKawaiSystem(List<List<double>> weights, double ll, double kk)
+    : _springLengths = List.generate(
+        weights.length,
+        (i) => List.generate(
+          weights[i].length,
+          (j) => ll * weights[i][j],
+          growable: false,
+        ),
+        growable: false,
+      ),
+      _springCoeffs = List.generate(
+        weights.length,
+        (i) => List.generate(
+          weights[i].length,
+          (j) =>
+              weights[i][j] == 0 ? 0.0 : kk / (weights[i][j] * weights[i][j]),
+          growable: false,
+        ),
+        growable: false,
+      );
+
+  /// Compute the energy function of the system for the Kamada-Kawai layout
+  /// algorithm at the [i]-th vertex in [positions] along with its gradient
+  /// vector.
+  /// The gradient vector will be added to [gradientOut].
+  ///
+  /// @returns The energy value at the [i]-th vertex.
+  ///
+  /// ### Note
+  /// The value of the energy is actually twice of the its by-definition
+  /// value. One needs to divide it by 2 to obtain the conventional energy value.
+  double energy(List<GraphVertex> positions, int i, GraphVertex gradientOut) {
+    final springLength = _springLengths[i];
+    final springCoeff = _springCoeffs[i];
+
+    double e = 0.0;
+    for (int j = 0; j < positions.length; ++j) {
+      if (i == j) continue;
+
+      final diff = positions[i] - positions[j];
+      final norm = diff.length;
+      final delta = norm - springLength[j];
+
+      e += springCoeff[j] * delta * delta;
+
+      if (norm == 0.0) continue;
+
+      diff.scale(springCoeff[j] * (1.0 - springLength[j] / norm));
+      gradientOut.add(diff);
+    }
+
+    return e;
+  }
+
+  // Compute the Hessian matrix of the energy function of the system for the
+  // Kamada-Kawai layout algorithm at the [i]-th vertex in [positions].
+  //
+  // @return A triple `(xx, xy, yy)` of the Hessian matrix components, where
+  // [xx] and [yy] are the diagonal components, and [xy] is the (common)
+  // off-diagonal.
+  @pragma('vm:prefer-inline')
+  @pragma('dart2js:tryInline')
+  (double, double, double) hessian(List<GraphVertex> positions, int i) {
+    // ULP for 64bit floating point numbers
+    const double epsilon = 1.0 / (1 << 52);
+
+    final springLength = _springLengths[i];
+    final springCoeff = _springCoeffs[i];
+    double xx = 0.0, xy = 0.0, yy = 0.0;
+    for (int j = 0; j < positions.length; ++j) {
+      if (j == i) continue;
+
+      final diff = positions[i] - positions[j];
+      final length1 = diff.length;
+      final length3 = length1 * diff.length2;
+
+      if (length1 < springLength[j] * epsilon) continue;
+
+      xx +=
+          springCoeff[j] * (1.0 - springLength[j] * diff.y * diff.y / length3);
+      xy += springCoeff[j] * springLength[j] * diff.x * diff.y / length3;
+      yy +=
+          springCoeff[j] * (1.0 - springLength[j] * diff.x * diff.x / length3);
+    }
+    return (xx, xy, yy);
   }
 }
