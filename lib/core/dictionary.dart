@@ -21,6 +21,8 @@ abstract interface class Dictionary {
 
   // Sync prefix search; implementations must maintain an in-memory key index.
   Iterable<String> isearch(String prefix);
+  // Sync index access to words in lexicographical order.
+  String atIndex(int index);
 
   int get size;
 }
@@ -167,6 +169,9 @@ class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
   @override
   Iterable<String> isearch(String key) => _radixTree.wordsWithPrefix(key);
 
+  @override
+  String atIndex(int index) => _radixTree[index];
+
   /// Subscript operator to find a [WordRecord] by its primary word.
   /// Returns the record if found, otherwise returns null.
   /// It is equivalent to calling [find] method.
@@ -263,6 +268,9 @@ class DBDictionary implements Dictionary {
 
   @override
   Iterable<String> isearch(String prefix) => _radixTree.wordsWithPrefix(prefix);
+
+  @override
+  String atIndex(int index) => _radixTree[index];
 
   @override
   int get size => _radixTree.size;
