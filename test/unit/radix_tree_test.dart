@@ -217,4 +217,145 @@ void main() {
       expect(tree.wordsWithPrefix('test'), containsAll(['test', 'tested']));
     });
   });
+
+  group('RadixTree.countWordsWithPrefix()', () {
+    late RadixTree tree;
+    setUp(() {
+      tree = RadixTree.fromIterable([
+        'test',
+        'testing',
+        'tested',
+        'app',
+        'apple',
+        'apply',
+        'banana',
+      ]);
+    });
+
+    test('returns total word count for an empty prefix', () {
+      expect(tree.countWordsWithPrefix(''), equals(7));
+    });
+
+    test('returns 0 for a non-existent prefix', () {
+      expect(tree.countWordsWithPrefix('xyz'), equals(0));
+    });
+
+    test('returns 0 on an empty tree', () {
+      expect(RadixTree().countWordsWithPrefix('test'), equals(0));
+    });
+
+    test('counts a word and all its extensions', () {
+      expect(tree.countWordsWithPrefix('test'), equals(3));
+    });
+
+    test('counts words when prefix is shorter than the stored label', () {
+      expect(tree.countWordsWithPrefix('ap'), equals(3));
+    });
+
+    test('returns 1 for a word with no extensions', () {
+      expect(tree.countWordsWithPrefix('banana'), equals(1));
+    });
+
+    test('returns 0 for a prefix longer than any matching word', () {
+      expect(tree.countWordsWithPrefix('testingly'), equals(0));
+    });
+
+    test('returns 0 for a partial label match that is not a valid prefix', () {
+      expect(tree.countWordsWithPrefix('tese'), equals(0));
+    });
+
+    test('increases after inserting a matching word', () {
+      tree.insert('tester');
+      expect(tree.countWordsWithPrefix('test'), equals(4));
+    });
+
+    test('decreases after deleting a matching word', () {
+      tree.delete('testing');
+      expect(tree.countWordsWithPrefix('test'), equals(2));
+    });
+  });
+
+  group('RadixTree.size', () {
+    test('is 0 for an empty tree', () {
+      expect(RadixTree().size, equals(0));
+    });
+
+    test('equals the number of inserted words', () {
+      final tree = RadixTree.fromIterable(['test', 'testing', 'app']);
+      expect(tree.size, equals(3));
+    });
+
+    test('increases by 1 after a successful insert', () {
+      final tree = RadixTree.fromIterable(['test', 'app']);
+      tree.insert('banana');
+      expect(tree.size, equals(3));
+    });
+
+    test('does not change after inserting a duplicate', () {
+      final tree = RadixTree.fromIterable(['test', 'app']);
+      tree.insert('test');
+      expect(tree.size, equals(2));
+    });
+
+    test('decreases by 1 after a successful delete', () {
+      final tree = RadixTree.fromIterable(['test', 'testing', 'app']);
+      tree.delete('testing');
+      expect(tree.size, equals(2));
+    });
+
+    test('does not change after deleting a non-existent word', () {
+      final tree = RadixTree.fromIterable(['test', 'app']);
+      tree.delete('xyz');
+      expect(tree.size, equals(2));
+    });
+  });
+
+  group('RadixTree.operator[]', () {
+    late RadixTree tree;
+    setUp(() {
+      tree = RadixTree.fromIterable([
+        'test',
+        'testing',
+        'tested',
+        'app',
+        'apple',
+        'apply',
+        'banana',
+      ]);
+    });
+
+    test('returns the word at index 0 (lexicographically first)', () {
+      expect(tree[0], equals('app'));
+    });
+
+    test('returns the word at the last valid index', () {
+      expect(tree[6], equals('testing'));
+    });
+
+    test('returns each word at its correct lexicographic index', () {
+      final sorted = [
+        'app',
+        'apple',
+        'apply',
+        'banana',
+        'test',
+        'tested',
+        'testing',
+      ];
+      for (var i = 0; i < sorted.length; i++) {
+        expect(tree[i], equals(sorted[i]));
+      }
+    });
+
+    test('reflects subsequent insertions', () {
+      tree.insert('cherry');
+      expect(tree[3], equals('banana'));
+      expect(tree[4], equals('cherry'));
+    });
+
+    test('reflects subsequent deletions', () {
+      tree.delete('app');
+      expect(tree[0], equals('apple'));
+    });
+  });
 }
