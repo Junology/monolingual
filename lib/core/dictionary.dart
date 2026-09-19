@@ -49,11 +49,10 @@ class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
   final RadixTree _radixTree = RadixTree();
 
   @override
-  int size;
+  int get size => _radixTree.size;
 
   InMemoryDictionary({this.capacity = 16})
-    : _buckets = List<_DictionaryNode?>.filled(capacity, null),
-      size = 0;
+    : _buckets = List<_DictionaryNode?>.filled(capacity, null);
 
   factory InMemoryDictionary.from(
     Iterable<WordRecord> records, {
@@ -124,7 +123,6 @@ class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
     if (_findNode(record.word, index) != null) return false;
 
     _buckets[index] = _DictionaryNode(record, _buckets[index]);
-    size++;
 
     _radixTree.insert(record.word);
 
@@ -158,7 +156,6 @@ class InMemoryDictionary extends Iterable<WordRecord> implements Dictionary {
     }
 
     if (removedRecord != null) {
-      size--;
       _radixTree.delete(word);
       if (size * 6 < capacity && capacity > 16) _rehash(capacity ~/ 2);
     }
@@ -224,8 +221,6 @@ class DBDictionary implements Dictionary {
   final DBService _service = DBService();
   final RadixTree _radixTree = RadixTree();
 
-  int _size = 0;
-
   DBDictionary._internal(this.name);
 
   /// Create and initialize a [DBDictionary] instance from the given dictionary name.
@@ -241,7 +236,6 @@ class DBDictionary implements Dictionary {
     for (final row in rows) {
       _radixTree.insert(row);
     }
-    _size = rows.length;
   }
 
   @override
@@ -252,7 +246,6 @@ class DBDictionary implements Dictionary {
     final success = await _service.insertWord(name, record);
     if (!success) return false;
     _radixTree.insert(record.word);
-    _size++;
     return true;
   }
 
@@ -262,7 +255,6 @@ class DBDictionary implements Dictionary {
     if (existing == null) return null;
     await _service.removeWord(name, word);
     _radixTree.delete(word);
-    _size--;
     return existing;
   }
 
@@ -273,5 +265,5 @@ class DBDictionary implements Dictionary {
   Iterable<String> isearch(String prefix) => _radixTree.wordsWithPrefix(prefix);
 
   @override
-  int get size => _size;
+  int get size => _radixTree.size;
 }
