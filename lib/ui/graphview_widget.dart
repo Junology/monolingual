@@ -242,11 +242,11 @@ class GraphRenderObject<V> extends RenderBox {
           ..strokeWidth = 2.0,
       );
     }
+
+    // Render the vertices and the edges
     for (final entry in _slotToChild.entries) {
       final slot = entry.key;
-      final child = entry.value as RenderBox;
       final pos = _graphLayout[slot]!;
-      // Draw the vertex at the given position.
       canvas.drawCircle(
         Offset(pos.x, pos.y) + size.center(offset),
         5.0,
@@ -254,8 +254,10 @@ class GraphRenderObject<V> extends RenderBox {
           ..color = vertexColor
           ..style = PaintingStyle.fill,
       );
-
-      // Paint children
+    }
+    // Render the child widgets on top of the vertices
+    for (final entry in _slotToChild.entries) {
+      final child = entry.value as RenderBox;
       final childParentData = child.parentData! as BoxParentData;
       context.paintChild(child, offset + childParentData.offset);
     }

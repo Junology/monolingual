@@ -29,7 +29,12 @@ class SynonymView extends StatefulWidget {
 }
 
 class _SynonymViewState extends State<SynonymView> {
-  ({Graph<String> graph, HashMap<String, GraphVertex> positions})? _graphData;
+  ({
+    Graph<String> graph,
+    HashMap<String, GraphVertex> positions,
+    HashMap<String, int> depths,
+  })?
+  _graphData;
 
   @override
   void initState() {
@@ -159,28 +164,43 @@ class _SynonymViewState extends State<SynonymView> {
     graphLayout.updateAll((_, v) => (v - basePos).scaled(widget.scale));
 
     setState(() {
-      _graphData = (graph: graph, positions: graphLayout);
+      _graphData = (graph: graph, positions: graphLayout, depths: depthMap);
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    const List<Color> depthColors = <Color>[
+      Colors.red,
+      Colors.orange,
+      Colors.yellow,
+      Colors.green,
+      Colors.blue,
+      Colors.indigo,
+      Colors.purple,
+    ];
     return _graphData == null
         ? const Center(child: CircularProgressIndicator())
         : GraphViewWidget(
             graph: _graphData!.graph,
             graphLayout: _graphData!.positions,
             vertexBuilder: (BuildContext context, String vertex) {
-              return ActionChip(
-                label: Text(vertex),
-                padding: const EdgeInsets.all(0.0),
-                side: const BorderSide(color: Colors.blue, width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.0),
+              final depth = _graphData!.depths[vertex] ?? 0;
+              final color = depthColors[depth % depthColors.length];
+              return Opacity(
+                opacity: pow(0.75, depth).toDouble(),
+                child: ActionChip(
+                  label: Text(vertex),
+                  padding: const EdgeInsets.all(0.0),
+                  side: BorderSide(color: color, width: 1.5),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  backgroundColor: color,
+                  onPressed: widget.onWordTapped != null
+                      ? (() => widget.onWordTapped!(vertex))
+                      : null,
                 ),
-                onPressed: widget.onWordTapped != null
-                    ? (() => widget.onWordTapped!(vertex))
-                    : null,
               );
             },
           );
