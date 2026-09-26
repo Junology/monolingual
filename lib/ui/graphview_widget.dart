@@ -10,17 +10,23 @@ class GraphViewWidget<V> extends RenderObjectWidget {
   final Graph<V> _graph;
   final HashMap<V, GraphVertex> _graphLayout;
   final Widget Function(BuildContext context, V vertex) _vertexBuilder;
+  final Color? _edgeColor;
 
   const GraphViewWidget({
     super.key,
     required this._graph,
     required this._graphLayout,
     required this._vertexBuilder,
+    this._edgeColor,
   });
 
   @override
   RenderObject createRenderObject(BuildContext context) {
-    return GraphRenderObject<V>(graph: _graph, graphLayout: _graphLayout);
+    return GraphRenderObject<V>(
+      graph: _graph,
+      graphLayout: _graphLayout,
+      edgeColor: _edgeColor ?? Colors.black,
+    );
   }
 
   @override
@@ -30,7 +36,8 @@ class GraphViewWidget<V> extends RenderObjectWidget {
   ) {
     renderObject
       ..graph = _graph
-      ..graphLayout = _graphLayout;
+      ..graphLayout = _graphLayout
+      ..edgeColor = _edgeColor ?? Colors.black;
   }
 
   @override
@@ -156,6 +163,7 @@ class GraphViewElement<V> extends RenderObjectElement {
 class GraphRenderObject<V> extends RenderBox {
   Graph<V> _graph;
   HashMap<V, GraphVertex> _graphLayout;
+  Color edgeColor;
   final HashMap<V, RenderObject> _slotToChild = HashMap<V, RenderObject>();
 
   Iterable<V> get slots => _slotToChild.keys;
@@ -177,7 +185,11 @@ class GraphRenderObject<V> extends RenderBox {
     markNeedsLayout();
   }
 
-  GraphRenderObject({required this._graph, required this._graphLayout});
+  GraphRenderObject({
+    required this._graph,
+    required this._graphLayout,
+    required this.edgeColor,
+  });
 
   @override
   void attach(PipelineOwner owner) {
@@ -224,7 +236,6 @@ class GraphRenderObject<V> extends RenderBox {
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    const Color arrowColor = Color(0x80000000);
     const Color vertexColor = Color(0xFF8080FF);
     final Canvas canvas = context.canvas;
     canvas.clipRect(offset & size, doAntiAlias: false);
@@ -238,7 +249,7 @@ class GraphRenderObject<V> extends RenderBox {
         Offset(sourcePos.x, sourcePos.y) + size.center(offset),
         Offset(targetPos.x, targetPos.y) + size.center(offset),
         Paint()
-          ..color = arrowColor
+          ..color = edgeColor
           ..strokeWidth = 2.0,
       );
     }
