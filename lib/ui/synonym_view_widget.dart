@@ -228,9 +228,7 @@ class _SynonymViewState extends State<SynonymView> {
                       borderRadius: BorderRadius.circular(12.0),
                     ),
                     backgroundColor: color.lighter(0.6),
-                    onPressed: widget.onWordTapped != null
-                        ? (() => widget.onWordTapped!(vertex))
-                        : null,
+                    onPressed: () => widget.onWordTapped?.call(vertex),
                   ),
                 ),
               );

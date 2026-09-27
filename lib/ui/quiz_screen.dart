@@ -119,15 +119,17 @@ class _QuizScreenBodyState extends State<_QuizScreenBody> {
   }
 
   AppBar _buildAppBar() {
-    const color = Colors.orange;
+    const color = Colors.black;
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.navigate_before),
+        hoverColor: Colors.grey.shade800,
         onPressed: () => Navigator.of(context).pop(),
       ),
       backgroundColor: color,
+      foregroundColor: Colors.white,
       elevation: 4.0,
-      shadowColor: color.shade800,
+      shadowColor: color,
     );
   }
 

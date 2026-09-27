@@ -1,11 +1,14 @@
 import 'dart:collection';
 import 'package:flutter/material.dart' hide AboutDialog;
-import 'package:monolingual/core/dictionary.dart';
-import 'package:monolingual/ui/word_view_screen.dart';
-import 'package:monolingual/ui/word_input_widget.dart';
-import 'package:monolingual/ui/text_filter_widget.dart';
-import 'package:monolingual/ui/synonym_view_widget.dart';
-import 'package:monolingual/ui/dialogs.dart';
+
+import '../core/dictionary.dart';
+
+import 'word_view_screen.dart';
+import 'word_input_widget.dart';
+import 'text_filter_widget.dart';
+import 'synonym_view_widget.dart';
+import 'quiz_screen.dart';
+import 'dialogs.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, Dictionary> dictionaries;
@@ -17,6 +20,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const appBarBGColor = Colors.teal;
+  static const appBarFGColor = Color.fromARGB(0xFF, 0xEC, 0xEF, 0xF4);
+
   late final TextEditingController _wordInputController;
   late final ValueNotifier<String?> _dictionaryNameNotifier;
 
@@ -84,81 +90,105 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(context, WordViewScreen(dictionary: dictionary, word: word));
   }
 
+  Future<Dictionary?> showDictionaryChooser(BuildContext context) async {
+    String? dictionaryName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          children: [
+            ..._filteredDictionariesNotifier.value.map((name) {
+              return SimpleDialogOption(
+                onPressed: () {
+                  Navigator.pop(context, name);
+                },
+                child: Text(name),
+              );
+            }),
+            IconButton(
+              icon: const Icon(Icons.cancel),
+              color: Colors.red,
+              onPressed: () {
+                Navigator.pop(context, null);
+              },
+            ),
+          ],
+        );
+      },
+    );
+    return dictionaryName != null ? widget.dictionaries[dictionaryName] : null;
+  }
+
+  AppBar _buildAppBar(BuildContext context) {
+    return AppBar(
+      backgroundColor: appBarBGColor,
+      foregroundColor: appBarFGColor,
+      elevation: 4.0,
+      shadowColor: appBarBGColor.shade800,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.info, color: Colors.white),
+          onPressed: () {
+            // `AboutDialog` is from `dialogs.dart`; not the one from Flutter.
+            showDialog(context: context, builder: (_) => const AboutDialog());
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        foregroundColor: Theme.of(context).colorScheme.onInverseSurface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info, color: Colors.white),
-            onPressed: () {
-              // `AboutDialog` is from `dialogs.dart`; not the one from Flutter.
-              showDialog(context: context, builder: (_) => const AboutDialog());
-            },
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(context),
       body: Column(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.book),
-              Expanded(
-                child: TextFilterWidget(
-                  items: widget.dictionaries.keys.toList(),
-                  searchMode: SearchMode.regex,
-                  filteredItemsNotifier: _filteredDictionariesNotifier,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) =>
-                        TextInputDialog(onSubmitted: _addDictionary),
-                  );
-                },
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              const Icon(Icons.search),
-              Expanded(
-                child: ValueListenableBuilder<Iterable<String>>(
-                  valueListenable: _filteredDictionariesNotifier,
-                  builder: (context, filteredDictionaries, child) {
-                    return WordInputField(
-                      wordIndexMap: Map.fromEntries(
-                        filteredDictionaries.map(
-                          (dictName) => MapEntry(
-                            dictName,
-                            widget.dictionaries[dictName]!.isearch,
-                          ),
-                        ),
-                      ),
-                      showDictionaryName: true,
-                      onSubmitted: _updateDisplayedWord,
-                      textEditingController: _wordInputController,
-                      dictionaryNameNotifier: _dictionaryNameNotifier,
+          Expanded(
+            child: Stack(
+              fit: StackFit.passthrough,
+              children: [
+                ValueListenableBuilder(
+                  valueListenable: _wordNotifier,
+                  builder: (context, value, child) {
+                    if (value == null) {
+                      return const SizedBox.expand();
+                    }
+                    return SynonymView(
+                      dictionary: value.dictionary,
+                      word: value.word,
+                      searchDepth: 3,
+                      visibleDepth: 2,
+                      onWordTapped: (word) =>
+                          _gotoWord(context, word, value.dictionary),
+                      scale: 50,
                     );
                   },
                 ),
-              ),
-              IconButton(
-                onPressed: () {
-                  _updateDisplayedWord(
-                    _wordInputController.text,
-                    _dictionaryNameNotifier.value,
-                  );
-                },
-                icon: const Icon(Icons.subdirectory_arrow_left),
-              ),
-            ],
+                Positioned(
+                  bottom: 16.0,
+                  right: 16.0,
+                  child: FloatingActionButton(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    hoverColor: Colors.grey.shade700,
+                    elevation: 6.0,
+                    onPressed: () {
+                      showDictionaryChooser(context).then((dictionary) {
+                        if (dictionary != null && context.mounted) {
+                          Navigator.push(
+                            context,
+                            QuizScreen(dictionary: dictionary),
+                          );
+                        }
+                      });
+                    },
+                    shape: const CircleBorder(),
+                    child: const Icon(Icons.quiz),
+                  ),
+                ),
+              ],
+            ),
           ),
+          /*
           Expanded(
             child: ValueListenableBuilder(
               valueListenable: _wordNotifier,
@@ -176,6 +206,85 @@ class _HomeScreenState extends State<HomeScreen> {
                   scale: 50,
                 );
               },
+            ),
+          ),
+          */
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            color: appBarBGColor.shade100,
+            child: Column(
+              children: [
+                Row(
+                  spacing: 3.0,
+                  children: [
+                    const Icon(Icons.book),
+                    Expanded(
+                      child: TextFilterWidget(
+                        items: widget.dictionaries.keys.toList(),
+                        searchMode: SearchMode.regex,
+                        filteredItemsNotifier: _filteredDictionariesNotifier,
+                        optionsViewOpenDirection: OptionsViewOpenDirection.up,
+                      ),
+                    ),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey.shade100.withAlpha(208),
+                      child: IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) =>
+                                TextInputDialog(onSubmitted: _addDictionary),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  spacing: 3.0,
+                  children: [
+                    const Icon(Icons.search),
+                    Expanded(
+                      child: ValueListenableBuilder<Iterable<String>>(
+                        valueListenable: _filteredDictionariesNotifier,
+                        builder: (context, filteredDictionaries, child) {
+                          return WordInputField(
+                            wordIndexMap: Map.fromEntries(
+                              filteredDictionaries.map(
+                                (dictName) => MapEntry(
+                                  dictName,
+                                  widget.dictionaries[dictName]!.isearch,
+                                ),
+                              ),
+                            ),
+                            showDictionaryName: true,
+                            onSubmitted: _updateDisplayedWord,
+                            textEditingController: _wordInputController,
+                            dictionaryNameNotifier: _dictionaryNameNotifier,
+                            optionsViewOpenDirection:
+                                OptionsViewOpenDirection.up,
+                          );
+                        },
+                      ),
+                    ),
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey.shade100.withAlpha(208),
+                      child: IconButton(
+                        onPressed: () {
+                          _updateDisplayedWord(
+                            _wordInputController.text,
+                            _dictionaryNameNotifier.value,
+                          );
+                        },
+                        icon: const Icon(Icons.subdirectory_arrow_left),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
