@@ -219,17 +219,19 @@ class _SynonymViewState extends State<SynonymView> {
               final color = depthColors[depth % depthColors.length];
               return Opacity(
                 opacity: pow(0.78, depth).toDouble(),
-                child: ActionChip(
-                  label: _labelBuilder(vertex),
-                  padding: const EdgeInsets.all(0.0),
-                  side: BorderSide(color: color, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.0),
+                child: ExcludeFocus(
+                  child: ActionChip(
+                    label: _labelBuilder(vertex),
+                    padding: const EdgeInsets.all(0.0),
+                    side: BorderSide(color: color, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.0),
+                    ),
+                    backgroundColor: color.lighter(0.6),
+                    onPressed: widget.onWordTapped != null
+                        ? (() => widget.onWordTapped!(vertex))
+                        : null,
                   ),
-                  backgroundColor: color.lighter(0.6),
-                  onPressed: widget.onWordTapped != null
-                      ? (() => widget.onWordTapped!(vertex))
-                      : null,
                 ),
               );
             },
