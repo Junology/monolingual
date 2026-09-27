@@ -20,6 +20,7 @@ class TextFilterWidget extends StatefulWidget {
   final FocusNode? focusNode;
   final VoidCallback? onSubmitted;
   final bool autoFocus;
+  final InputDecoration? inputDecoration;
 
   const TextFilterWidget({
     super.key,
@@ -29,6 +30,11 @@ class TextFilterWidget extends StatefulWidget {
     this.focusNode,
     this.onSubmitted,
     this.autoFocus = false,
+    this.inputDecoration = const InputDecoration(
+      fillColor: Colors.white,
+      filled: true,
+      border: OutlineInputBorder(),
+    ),
   });
 
   @override
@@ -39,6 +45,7 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
   late ValueNotifier<Iterable<String>> _filteredItemsNotifier;
   late FocusNode _focusNode;
   late TextEditingController _textEditingController;
+  late InputDecoration? _inputDecoration;
   bool _validInput = true;
 
   @override
@@ -48,6 +55,7 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
         widget.filteredItemsNotifier ?? ValueNotifier(widget.items);
     _focusNode = widget.focusNode ?? FocusNode();
     _textEditingController = TextEditingController();
+    _inputDecoration = widget.inputDecoration;
   }
 
   @override
@@ -66,6 +74,9 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
         _focusNode.dispose();
       }
       _focusNode = widget.focusNode ?? FocusNode();
+    }
+    if (widget.inputDecoration != oldWidget.inputDecoration) {
+      _inputDecoration = widget.inputDecoration;
     }
   }
 
@@ -123,8 +134,7 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
               controller: textEditingController,
               focusNode: focusNode,
               autofocus: widget.autoFocus,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
+              decoration: _inputDecoration?.copyWith(
                 error: _validInput
                     ? null
                     : const Icon(Icons.error, size: 16, color: Colors.red),

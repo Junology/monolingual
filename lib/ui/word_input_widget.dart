@@ -9,6 +9,7 @@ class WordInputField extends StatefulWidget {
   final FocusNode? focusNode;
   final void Function(String word, String? dictionaryName)? onSubmitted;
   final bool autofocus;
+  final InputDecoration? inputDecoration;
 
   const WordInputField({
     super.key,
@@ -19,6 +20,11 @@ class WordInputField extends StatefulWidget {
     this.focusNode,
     this.onSubmitted,
     this.autofocus = false,
+    this.inputDecoration = const InputDecoration(
+      fillColor: Colors.white,
+      filled: true,
+      border: OutlineInputBorder(),
+    ),
   });
 
   @override
@@ -29,6 +35,7 @@ class _WordInputFieldState extends State<WordInputField> {
   late TextEditingController _textEditingController;
   late ValueNotifier<String?> _dictionaryNameNotifier;
   late FocusNode _focusNode;
+  late InputDecoration? _inputDecoration;
 
   late Map<String, Iterable<String> Function(String)> _wordIndexMap;
 
@@ -43,6 +50,7 @@ class _WordInputFieldState extends State<WordInputField> {
     _wordIndexMap = Map<String, Iterable<String> Function(String)>.from(
       widget.wordIndexMap,
     );
+    _inputDecoration = widget.inputDecoration;
   }
 
   @override
@@ -67,6 +75,9 @@ class _WordInputFieldState extends State<WordInputField> {
         _focusNode.dispose();
       }
       _focusNode = widget.focusNode ?? FocusNode();
+    }
+    if (widget.inputDecoration != oldWidget.inputDecoration) {
+      _inputDecoration = widget.inputDecoration;
     }
     // TODO: Detect change of [wordIndexMap] properly
     const mapEquality = MapEquality();
@@ -206,7 +217,7 @@ class _WordInputFieldState extends State<WordInputField> {
                   widget.onSubmitted?.call(value, dictionaryName);
                 }
               },
-              decoration: InputDecoration(
+              decoration: _inputDecoration?.copyWith(
                 suffix: _buildDictionaryNameSuffix(context, dictionaryName),
               ),
               enabled: _wordIndexMap.isNotEmpty,
