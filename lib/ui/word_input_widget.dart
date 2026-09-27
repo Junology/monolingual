@@ -10,6 +10,7 @@ class WordInputField extends StatefulWidget {
   final void Function(String word, String? dictionaryName)? onSubmitted;
   final bool autofocus;
   final InputDecoration? inputDecoration;
+  final OptionsViewOpenDirection optionsViewOpenDirection;
 
   const WordInputField({
     super.key,
@@ -25,6 +26,7 @@ class WordInputField extends StatefulWidget {
       filled: true,
       border: OutlineInputBorder(),
     ),
+    this.optionsViewOpenDirection = OptionsViewOpenDirection.down,
   });
 
   @override
@@ -195,6 +197,7 @@ class _WordInputFieldState extends State<WordInputField> {
           return cmp != 0 ? cmp : a.key.compareTo(b.key);
         });
       },
+      optionsViewOpenDirection: widget.optionsViewOpenDirection,
       displayStringForOption: (option) => option.value,
       onSelected: (option) =>
           setState(() => _dictionaryNameNotifier.value = option.key),
@@ -226,29 +229,26 @@ class _WordInputFieldState extends State<WordInputField> {
       optionsViewBuilder: (context, onSelected, options) {
         // Get the index of the currently highlighted option.
         int highlightedOptionIndex = AutocompleteHighlightedOption.of(context);
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final option = options.elementAt(index);
-                  return ListTile(
-                    title: Text(option.value),
-                    trailing: _buildDictionaryNameSuffix(context, option.key),
-                    selected: index == highlightedOptionIndex,
-                    selectedTileColor: Theme.of(context).highlightColor,
-                    onTap: () {
-                      onSelected(option);
-                    },
-                  );
-                },
-              ),
+        return Material(
+          elevation: 4.0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              shrinkWrap: true,
+              itemCount: options.length,
+              itemBuilder: (context, index) {
+                final option = options.elementAt(index);
+                return ListTile(
+                  title: Text(option.value),
+                  trailing: _buildDictionaryNameSuffix(context, option.key),
+                  selected: index == highlightedOptionIndex,
+                  selectedTileColor: Theme.of(context).highlightColor,
+                  onTap: () {
+                    onSelected(option);
+                  },
+                );
+              },
             ),
           ),
         );

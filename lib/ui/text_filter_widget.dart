@@ -21,6 +21,7 @@ class TextFilterWidget extends StatefulWidget {
   final VoidCallback? onSubmitted;
   final bool autoFocus;
   final InputDecoration? inputDecoration;
+  final OptionsViewOpenDirection optionsViewOpenDirection;
 
   const TextFilterWidget({
     super.key,
@@ -35,6 +36,7 @@ class TextFilterWidget extends StatefulWidget {
       filled: true,
       border: OutlineInputBorder(),
     ),
+    this.optionsViewOpenDirection = OptionsViewOpenDirection.down,
   });
 
   @override
@@ -121,6 +123,7 @@ class _TextFilterWidgetState extends State<TextFilterWidget> {
         }
         return _filterItems(textEditingValue.text);
       },
+      optionsViewOpenDirection: widget.optionsViewOpenDirection,
       onSelected: (String item) =>
           setState(() => _filteredItemsNotifier.value = [item]),
       fieldViewBuilder:
