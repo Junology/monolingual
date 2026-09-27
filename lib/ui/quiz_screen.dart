@@ -109,7 +109,6 @@ class _QuizScreenBodyState extends State<_QuizScreenBody> {
   }
 
   void _validateField() {
-    debugPrint('Validating field: input="${_controller.text}", word="$_word"');
     if (_controller.text == _word) {
       _fieldBorderColorNotifier.value = correctFieldBorderColor;
       _transitionToNextWord();

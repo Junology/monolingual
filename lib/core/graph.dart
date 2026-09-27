@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:collection';
 import 'package:collection/collection.dart';
-import 'package:flutter/foundation.dart'; // for debug
 import 'package:vector_math/vector_math_64.dart';
 
 typedef GraphWeight = int;
@@ -494,11 +493,6 @@ class Graph<V> {
         //  - Furthermore, if the new gradient is not even smaller than the
         //    second maximum, then give up and terminate the outer loop as well.
         if (newEnergy >= maxEnergy) {
-          if (kDebugMode) {
-            print(
-              'New energy ($newEnergy) did not improve over max energy ($maxEnergy).',
-            );
-          }
           positions[iMax] = oldPosition;
           if (newDelta >= secondMaxDelta) {
             itrCount = maxIterations;
@@ -512,14 +506,6 @@ class Graph<V> {
 
         // Terminate the inner loop if the gradient reaches below the tolerance.
         if (maxDelta < threshold) break;
-      }
-
-      if (itrCount + 1 >= maxIterations) {
-        if (kDebugMode) {
-          print(
-            'The loop has reached the maximum number of iterations ($maxIterations).',
-          );
-        }
       }
     }
 

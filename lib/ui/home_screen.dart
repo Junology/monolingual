@@ -76,9 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateDisplayedWord(String word, String? dictionaryName) {
     dictionaryName ??= _filteredDictionariesNotifier.value.singleOrNull;
 
-    debugPrint(
-      'Updating displayed word: $word, dictionaryName: $dictionaryName',
-    );
     if (dictionaryName == null || word.isEmpty) return;
     final dictionary = widget.dictionaries[dictionaryName];
     if (dictionary == null) return;
@@ -87,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _gotoWord(BuildContext context, String word, Dictionary dictionary) {
-    debugPrint('Word tapped: $word');
     Navigator.push(context, WordViewScreen(dictionary: dictionary, word: word));
   }
 
