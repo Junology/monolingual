@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'package:flutter/material.dart' hide AboutDialog;
+import 'package:google_fonts/google_fonts.dart';
 
 import '../core/dictionary.dart';
 
@@ -124,6 +125,13 @@ class _HomeScreenState extends State<HomeScreen> {
       foregroundColor: appBarFGColor,
       elevation: 4.0,
       shadowColor: appBarBGColor.shade800,
+      title: Text(
+        'Mɒn.əʊˈlɪŋ.ɡwəl',
+        style: GoogleFonts.lato(
+          fontSize: Theme.of(context).textTheme.titleLarge?.fontSize ?? 20,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.info, color: Colors.white),
