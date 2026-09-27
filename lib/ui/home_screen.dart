@@ -125,6 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
       foregroundColor: appBarFGColor,
       elevation: 4.0,
       shadowColor: appBarBGColor.shade800,
+      // Title logo
+      // For fonts: see https://www.vulgarlang.com/ipafonts/
       title: Text(
         'Mɒn.əʊˈlɪŋ.ɡwəl',
         style: GoogleFonts.lato(
